@@ -5,6 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Serilog;
 
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddCors(options =>
@@ -29,11 +33,13 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Add logging
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .CreateLogger();
-
-builder.Host.UseSerilog();
+builder.Host.UseSerilog((context, services, loggerConfiguration) =>
+{
+    loggerConfiguration
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext();
+});
 
 // Add Authentication Services
 builder.Services.AddAuthentication(options =>
@@ -80,6 +86,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors();
 
 app.UseAuthorization();
+app.UseSerilogRequestLogging();
 app.MapControllers();
 
 app.Run();
