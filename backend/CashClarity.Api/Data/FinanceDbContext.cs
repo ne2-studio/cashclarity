@@ -1,7 +1,5 @@
 using CashClarity.Api.Models;
-using dotenv.net;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Design;
 
 namespace CashClarity.Api.Data;
 
@@ -106,20 +104,5 @@ public class FinanceDbContext(DbContextOptions<FinanceDbContext> options) : DbCo
             e.HasIndex(bm => bm.EntityId).HasDatabaseName("idx_bank_movements_entity_id");
             e.HasIndex(bm => bm.JournalEntryId).HasDatabaseName("idx_bank_movements_journal_entry_id");
         });
-    }
-}
-
-// Used by `dotnet ef migrations` at design time (no app host needed)
-public class FinanceDbContextFactory : IDesignTimeDbContextFactory<FinanceDbContext>
-{
-    public FinanceDbContext CreateDbContext(string[] args)
-    {
-        DotEnv.Load(options: new DotEnvOptions(ignoreExceptions: true));
-        var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
-            ?? "Host=localhost;Database=cashclarity_dev;Username=postgres";
-        var opts = new DbContextOptionsBuilder<FinanceDbContext>()
-            .UseNpgsql(connectionString)
-            .Options;
-        return new FinanceDbContext(opts);
     }
 }

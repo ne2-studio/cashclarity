@@ -9,7 +9,7 @@ public class BankMovement
     public bool IsIdentified { get; set; }
     public string? EntityId { get; set; }
     public Guid? JournalEntryId { get; set; }
-    public Guid UserId { get; set; }
+    public string UserId { get; set; } = "";
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

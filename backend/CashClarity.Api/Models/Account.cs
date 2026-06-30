@@ -8,7 +8,7 @@ public class Account
     public string Type { get; set; } = "";
     public decimal Balance { get; set; }
     public bool IsSystem { get; set; }
-    public Guid UserId { get; set; }
+    public string UserId { get; set; } = "";
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

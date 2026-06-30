@@ -17,16 +17,15 @@ public class FinanceRepository(FinanceDbContext db)
 
     public async Task<List<AccountResponse>> GetAccounts(string userId)
     {
-        var userGuid = Guid.Parse(userId);
-        await EnsureSystemAccounts(userGuid);
+        await EnsureSystemAccounts(userId);
         return await db.Accounts
-            .Where(a => a.UserId == userGuid)
+            .Where(a => a.UserId == userId)
             .OrderBy(a => a.Name)
             .Select(a => new AccountResponse(a.Id, a.Code, a.Name, a.Type, a.Balance, a.IsSystem, userId))
             .ToListAsync();
     }
 
-    private async Task EnsureSystemAccounts(Guid userId)
+    private async Task EnsureSystemAccounts(string userId)
     {
         foreach (var (code, name, type) in SystemAccounts)
         {
@@ -47,7 +46,7 @@ public class FinanceRepository(FinanceDbContext db)
             Type = req.Type,
             Balance = req.Balance,
             IsSystem = req.IsSystem ?? false,
-            UserId = Guid.Parse(userId),
+            UserId = userId,
         };
         db.Accounts.Add(account);
         await db.SaveChangesAsync();
@@ -57,7 +56,7 @@ public class FinanceRepository(FinanceDbContext db)
     public async Task UpdateAccount(string id, AccountPatchRequest patch, string userId)
     {
         var account = await db.Accounts
-            .FirstOrDefaultAsync(a => a.Id == id && a.UserId == Guid.Parse(userId))
+            .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId)
             ?? throw new Exception("Account not found or access denied");
 
         if (patch.Code is not null) account.Code = patch.Code;
@@ -72,7 +71,7 @@ public class FinanceRepository(FinanceDbContext db)
     public async Task DeleteAccount(string id, string userId)
     {
         await db.Accounts
-            .Where(a => a.Id == id && a.UserId == Guid.Parse(userId))
+            .Where(a => a.Id == id && a.UserId == userId)
             .ExecuteDeleteAsync();
     }
 
@@ -80,10 +79,9 @@ public class FinanceRepository(FinanceDbContext db)
 
     public async Task<List<JournalEntryResponse>> GetJournalEntries(string userId)
     {
-        var userGuid = Guid.Parse(userId);
         var entries = await db.JournalEntries
             .Include(je => je.Lines)
-            .Where(je => je.UserId == userGuid)
+            .Where(je => je.UserId == userId)
             .OrderByDescending(je => je.Date)
             .ToListAsync();
 
@@ -96,7 +94,7 @@ public class FinanceRepository(FinanceDbContext db)
         {
             Date = ParseDate(req.Date),
             Description = req.Description,
-            UserId = Guid.Parse(userId),
+            UserId = userId,
             Lines = req.Lines.Select(l => new JournalLine
             {
                 AccountId = l.AccountId,
@@ -115,7 +113,7 @@ public class FinanceRepository(FinanceDbContext db)
         var entryId = Guid.Parse(id);
         var entry = await db.JournalEntries
             .Include(je => je.Lines)
-            .FirstOrDefaultAsync(je => je.Id == entryId && je.UserId == Guid.Parse(userId))
+            .FirstOrDefaultAsync(je => je.Id == entryId && je.UserId == userId)
             ?? throw new Exception("Journal entry not found or access denied");
 
         if (patch.Date is not null) entry.Date = ParseDate(patch.Date);
@@ -142,7 +140,7 @@ public class FinanceRepository(FinanceDbContext db)
     public async Task DeleteJournalEntry(string id, string userId)
     {
         await db.JournalEntries
-            .Where(je => je.Id == Guid.Parse(id) && je.UserId == Guid.Parse(userId))
+            .Where(je => je.Id == Guid.Parse(id) && je.UserId == userId)
             .ExecuteDeleteAsync();
     }
 
@@ -150,9 +148,8 @@ public class FinanceRepository(FinanceDbContext db)
 
     public async Task<List<BankMovementResponse>> GetBankMovements(string userId)
     {
-        var userGuid = Guid.Parse(userId);
         var movements = await db.BankMovements
-            .Where(bm => bm.UserId == userGuid)
+            .Where(bm => bm.UserId == userId)
             .OrderByDescending(bm => bm.Date)
             .ToListAsync();
 
@@ -169,7 +166,7 @@ public class FinanceRepository(FinanceDbContext db)
             EntityId = req.EntityId,
             JournalEntryId = req.JournalEntryId is null ? null : Guid.Parse(req.JournalEntryId),
             IsIdentified = false,
-            UserId = Guid.Parse(userId),
+            UserId = userId,
         };
         db.BankMovements.Add(movement);
         await db.SaveChangesAsync();
@@ -179,7 +176,7 @@ public class FinanceRepository(FinanceDbContext db)
     public async Task UpdateBankMovement(string id, BankMovementPatchRequest patch, string userId)
     {
         var movement = await db.BankMovements
-            .FirstOrDefaultAsync(bm => bm.Id == Guid.Parse(id) && bm.UserId == Guid.Parse(userId))
+            .FirstOrDefaultAsync(bm => bm.Id == Guid.Parse(id) && bm.UserId == userId)
             ?? throw new Exception("Bank movement not found or access denied");
 
         if (patch.Date is not null) movement.Date = ParseDate(patch.Date);
@@ -195,7 +192,7 @@ public class FinanceRepository(FinanceDbContext db)
     public async Task DeleteBankMovement(string id, string userId)
     {
         await db.BankMovements
-            .Where(bm => bm.Id == Guid.Parse(id) && bm.UserId == Guid.Parse(userId))
+            .Where(bm => bm.Id == Guid.Parse(id) && bm.UserId == userId)
             .ExecuteDeleteAsync();
     }
 

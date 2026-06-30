@@ -70,8 +70,9 @@ namespace CashClarity.Api.Migrations
                         .HasColumnName("updated_at")
                         .HasDefaultValueSql("timezone('utc'::text, now())");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");
@@ -133,8 +134,9 @@ namespace CashClarity.Api.Migrations
                         .HasColumnName("updated_at")
                         .HasDefaultValueSql("timezone('utc'::text, now())");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");
@@ -178,8 +180,9 @@ namespace CashClarity.Api.Migrations
                         .HasColumnName("updated_at")
                         .HasDefaultValueSql("timezone('utc'::text, now())");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");

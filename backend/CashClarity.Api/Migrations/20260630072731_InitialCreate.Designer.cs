@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CashClarity.Api.Migrations
 {
     [DbContext(typeof(FinanceDbContext))]
-    [Migration("20260622135820_InitialCreate")]
+    [Migration("20260630072731_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -73,8 +73,9 @@ namespace CashClarity.Api.Migrations
                         .HasColumnName("updated_at")
                         .HasDefaultValueSql("timezone('utc'::text, now())");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");
@@ -136,8 +137,9 @@ namespace CashClarity.Api.Migrations
                         .HasColumnName("updated_at")
                         .HasDefaultValueSql("timezone('utc'::text, now())");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");
@@ -181,8 +183,9 @@ namespace CashClarity.Api.Migrations
                         .HasColumnName("updated_at")
                         .HasDefaultValueSql("timezone('utc'::text, now())");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");

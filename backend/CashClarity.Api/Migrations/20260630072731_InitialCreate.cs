@@ -21,7 +21,7 @@ namespace CashClarity.Api.Migrations
                     type = table.Column<string>(type: "text", nullable: false),
                     balance = table.Column<decimal>(type: "numeric(15,2)", precision: 15, scale: 2, nullable: false, defaultValue: 0m),
                     is_system = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
-                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    user_id = table.Column<string>(type: "text", nullable: false),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "timezone('utc'::text, now())"),
                     updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "timezone('utc'::text, now())")
                 },
@@ -37,7 +37,7 @@ namespace CashClarity.Api.Migrations
                     id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
                     date = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "timezone('utc'::text, now())"),
                     description = table.Column<string>(type: "text", nullable: true),
-                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    user_id = table.Column<string>(type: "text", nullable: false),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "timezone('utc'::text, now())"),
                     updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "timezone('utc'::text, now())")
                 },
@@ -57,7 +57,7 @@ namespace CashClarity.Api.Migrations
                     is_identified = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
                     entity_id = table.Column<string>(type: "text", nullable: true),
                     journal_entry_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    user_id = table.Column<string>(type: "text", nullable: false),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "timezone('utc'::text, now())"),
                     updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "timezone('utc'::text, now())")
                 },
