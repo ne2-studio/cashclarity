@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-background: #0B0F14;
+  --color-surface: #121821;
+  --color-surface-elevated: #18202B;
+  --color-primary-green: #22C55E;
+  --color-primary-orange: #F97316;
+  --color-text-primary: #E5E7EB;
+  --color-text-secondary: #9CA3AF;
+  --color-error: #EF4444;
+  --color-border: #1F2937;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-text-primary antialiased selection:bg-primary-orange/30;
+  }
+
+  input, select, textarea {
+    @apply bg-surface border-border text-text-primary focus:ring-1 focus:ring-primary-orange focus:border-primary-orange outline-none transition-all;
+  }
+
+  table {
+    @apply w-full border-collapse text-sm;
+  }
+
+  th {
+    @apply text-left font-mono text-[10px] uppercase tracking-wider text-text-secondary border-b border-border p-3;
+  }
+
+  td {
+    @apply p-3 border-b border-border/50;
+  }
+}
+
+.financial-card {
+  @apply bg-surface border border-border rounded-sm p-5 transition-all hover:border-border/80;
+}
+
+.numeric {
+  @apply font-mono text-right tabular-nums;
+}
+
+.positive {
+  @apply text-primary-green;
+}
+
+.negative {
+  @apply text-error;
+}
+
+.warning {
+  @apply text-primary-orange;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-background;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-border rounded-full hover:bg-text-secondary/30;
+}
