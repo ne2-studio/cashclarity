@@ -1,6 +1,6 @@
-# CashClarity Architecture
+# {ProjectName} Architecture
 
-This document captures the architecture rules currently followed in this codebase — project structure, layering, and conventions for both services. It describes what *is*, not what's aspirational; when extending the app, follow these patterns unless there's a specific reason to deviate.
+This document is the architecture standard for new projects: project structure, layering, and conventions for both services. It describes what *should be built*, distilled from patterns proven across prior projects; when starting or extending a project, follow these patterns unless there's a specific, documented reason to deviate.
 
 ## System overview
 
@@ -9,52 +9,75 @@ Monorepo with two independently deployable services, no shared code between them
 | Directory | Stack |
 |---|---|
 | `frontend/` | React 19, TypeScript, Vite, Tailwind CSS v4, Zustand, react-oidc-context |
-| `backend/` | ASP.NET Core (.NET 10), Entity Framework Core, PostgreSQL, Serilog |
+| `backend/` | ASP.NET Core (.NET 10), PostgreSQL, Serilog |
 
-Auth is OIDC/JWT Bearer end-to-end: the frontend authenticates against an external OIDC provider (Zitadel, `auth.ne2.studio`), attaches the access token to every API call, and the backend validates it via `JwtBearer` middleware. There is no session state on the backend — every request is authenticated independently and scoped to the caller's user id.
+Auth is OIDC/JWT Bearer end-to-end: the frontend authenticates against an external OIDC provider (e.g. Zitadel, Auth0, Okta), attaches the access token to every API call, and the backend validates it via `JwtBearer` middleware. There is no session state on the backend — every request is authenticated independently and scoped to the caller's identity.
 
 ---
 
-## Backend (`backend/CashClarity.Api`)
+## Backend (`backend/{ProjectName}.Api`)
 
-### Layers
+### Architecture: ports & adapters
 
-Requests flow through a strict, one-directional pipeline. Each layer only knows about the layer directly below it:
+The backend is split across three projects, with dependencies pointing inward toward the core:
 
 ```
-Controllers  →  Repositories  →  Data (DbContext)  →  Models (EF entities)
-                     ↓
-                  Domain (request/response DTOs)
+{ProjectName}.Api  ──┐
+                      ├──→  {ProjectName}  (core: Application + Ports)
+{ProjectName}.Infra ──┘
 ```
 
-- **`Controllers/`** — one controller per bounded resource area (currently a single `FinanceController` covering accounts, journal entries, and bank movements). Controllers:
-  - Are thin: extract the caller's `UserId` from the JWT claim, delegate to a repository method, and wrap the result in `Ok(...)`.
-  - Never touch `DbContext` or EF types directly.
-  - Wrap every action body in a top-level `try/catch` that returns `StatusCode(500, new { error = ex.Message })` on failure — there is no global exception middleware; error handling is per-action.
-  - Route under a shared `[Route("server")]` prefix, grouped by resource with `// Comment` section headers (`// Accounts`, `// Journal Entries`, `// Bank Movements`).
-  - Every endpoint is `[Authorize]` (class-level attribute) except `health`.
-- **`Repositories/`** — one repository per DbContext (currently `FinanceRepository`), injected via primary-constructor DI (`public class FinanceRepository(FinanceDbContext db)`). Repositories:
-  - Own all query and persistence logic (EF LINQ queries, `ExecuteDeleteAsync`, raw SQL only for upserts like `EnsureSystemAccounts`).
-  - Take `userId` as an explicit parameter on every method and filter every query by it — this is the multi-tenancy boundary. There is no global query filter; every repository method is individually responsible for scoping to the caller.
-  - Map EF entities to `Domain` response records before returning (`MapAccount`, `MapEntry`, `MapBankMovement`), grouped under a `// Mappers` section at the bottom of the file. Controllers and callers never see EF entities.
-  - Apply patch-style partial updates by checking each field for a non-null/`HasValue` value before assigning (see `UpdateAccount`, `UpdateBankMovement`).
-  - Throw plain `Exception` for not-found/access-denied cases (no custom exception hierarchy); the controller's catch-all turns this into a 500.
-- **`Domain/`** — plain C# `record` types only, split into two clearly commented groups in a single `Finance.cs` file: `Response records (returned to client)` and `Request records (received from client)`. These are the DTO layer; no behavior, no EF attributes.
-- **`Models/`** — EF Core entity classes (`Account`, `JournalEntry`, `JournalLine`, `BankMovement`), one class per file, mutable properties, no business logic.
-- **`Data/`** — a single `FinanceDbContext` with all table/column/index mapping done via Fluent API in `OnModelCreating` (no data annotations on entities). Table and column names are `snake_case`; C# properties are `PascalCase`.
-- **`Migrations/`** — EF Core migrations, applied automatically at startup via `dbContext.Database.Migrate()` in `Program.cs` (no manual migration step in deploy).
+- **`{ProjectName}` (core)** — the domain/use-case project. Contains:
+  - `Application/` — one class per use case (e.g. a "handler" implementing an input port), holding all business logic.
+  - `Ports/Input/` — use-case interfaces and their request/response DTOs (plain `record` types, no behavior, no framework attributes). This is the contract the API layer calls into.
+  - `Ports/Output/` — interfaces for everything the core needs from the outside world: repositories, clock, id/slug/token generation, external services, configuration values.
+  - This project references only minimal, framework-agnostic libraries (a `Result` type library such as CSharpFunctionalExtensions, logging abstractions) — **no ASP.NET Core, no DB driver, no ORM.** It must be fully unit-testable in isolation, with no infrastructure dependencies to fake.
+- **`{ProjectName}.Infra`** — implements every output port (repositories, external service clients, clock, generators, config readers) and exposes a single composition-root extension method (e.g. `ServiceRegistration.AddInfrastructure()`) called once from `Program.cs`. This is the only place infra wiring happens.
+- **`{ProjectName}.Api`** — thin ASP.NET Core host: controllers, `Program.cs`, auth/rate-limiting/API-docs setup. Controllers depend only on `Ports/Input` interfaces, never on `Infra` or `Application` concrete types directly.
 
-### Conventions
+### Controller conventions
 
-- **IDs**: `Account.Id` is a `text` primary key with a Postgres `gen_random_uuid()::text` default (business/system accounts use human-readable codes like `"0001"`, `"9999"`). Everything else (`JournalEntry`, `JournalLine`, `BankMovement`) uses `Guid` primary keys. DTOs always expose ids as `string`; repositories `Guid.Parse` incoming string ids.
-- **Multi-tenancy**: every table that holds user data has a `UserId` column; every repository method takes and filters by `userId` explicitly. There's no row-level security or global filter — this must be done manually per query.
-- **Timestamps**: every entity has `CreatedAt`/`UpdatedAt` (`timestamp with time zone`), defaulted at the DB level via `timezone('utc'::text, now())`. Dates from the client are plain strings, parsed via a shared `ParseDate` helper that assumes/adjusts to UTC.
-- **Money**: `decimal` with `HasPrecision(15, 2)` everywhere.
-- **DI lifetime**: `DbContext` and repositories are registered `Scoped`.
-- **Logging**: Serilog, configured in two layers — a bootstrap console logger created before `WebApplication.CreateBuilder`, then reconfigured via `UseSerilog` reading from `appsettings.json`/environment config. Production adds a Seq sink (`appsettings.Production.json`); request logging via `UseSerilogRequestLogging()`.
+- Thin: extract the caller's identity from the JWT claim (if applicable), delegate to a use-case method, map the result to an HTTP response.
+- Use `Result<T>`/`Result` (e.g. CSharpFunctionalExtensions) for expected failure paths instead of throwing. Controllers branch on `result.IsSuccess` and map explicitly to the right status code (`BadRequest` for validation, `NotFound` for missing resources, `Ok`/`NoContent` for success) — no blanket `try/catch` returning 500 for everything, and no swallowed stack traces.
+- One controller per bounded resource area, routed under a shared prefix, grouped by resource.
+- Every endpoint is `[Authorize]` by default except explicitly public endpoints (health checks, public redirects, etc.).
+
+### Core conventions
+
+- **Every external effect sits behind an interface the core owns**: clock, id/slug generation, configuration reads, external services. No inline `DateTime.UtcNow`, `new Random()`, or raw `IConfiguration` reads inside use-case code — this is what makes fake-based unit testing possible without a mocking framework for core logic.
+- **Decorator pattern for cross-cutting infra concerns, composed in the DI root**, rather than baked into a single adapter class — e.g. a caching decorator wrapping a repository, or a buffering/batching decorator wrapping a tracking client that flushes on a timer instead of writing synchronously per request. Decorators are wired by wrapping the concrete instance inside the infra composition-root method, so the decorated chain is visible in one place.
+- **Null Object pattern for feature-flagged behavior.** A config flag switches, at the composition root, between a real adapter and a no-op implementation — use-case code never checks the flag itself, it just depends on the interface.
+- **DI lifetimes are chosen by statefulness, not a blanket rule.** Default to `Scoped`. Register `Singleton` only for services that must hold state across requests (e.g. an in-memory buffer with a flush timer), and treat that as a deliberate, documented exception.
+
+### Data access
+
+Choose the approach per project based on domain complexity:
+
+- **Dapper + FluentMigrator** — for simple/CRUD-shaped domains. Raw parameterized SQL per repository method (no LINQ-to-SQL translation layer); migrations are plain C# `Migration` classes independent of any ORM.
+- **Entity Framework Core** — for complex domains with many relationships or business rules where LINQ and change tracking pay off. Table/column/index mapping via Fluent API in `OnModelCreating` (avoid data annotations on entities); EF Core migrations.
+- **Regardless of choice, the project must provide a mechanism to run migrations automatically** — applied at startup (`dbContext.Database.Migrate()` for EF Core, `IMigrationRunner.MigrateUp()` for FluentMigrator) or via an explicit, documented deploy step. Never ship a project where schema changes require manual, undocumented DBA intervention.
+- **DB-level constraints (uniqueness, foreign keys) back up application-level checks as defense-in-depth** against races (e.g. catch the database's unique-violation error and translate it to a domain-meaningful error) — they don't replace an application-level check-then-act, they cover its gap.
+
+### Other conventions
+
+- **IDs**: prefer `Guid` primary keys by default; use `text` primary keys with human-readable codes only where the domain calls for it (e.g. well-known system rows). DTOs always expose ids as `string`; parse to the underlying type at the adapter boundary.
+- **Multi-tenancy** (if the domain is multi-tenant): every tenant-scoped table has an explicit tenant/user id column; every repository method takes and filters by it explicitly. Don't rely on a global query filter or row-level security unless that's a deliberate, documented choice — scoping should be visible at each call site.
+- **Timestamps**: every entity has `CreatedAt`/`UpdatedAt` (`timestamp with time zone`), defaulted at the DB level to UTC. Dates from the client are parsed via a shared helper that assumes/adjusts to UTC.
+- **Money** (if the domain handles it): `decimal` with an explicit, consistent precision everywhere it's stored.
+- **Logging**: Serilog, configured in two layers — a bootstrap console logger created before `WebApplication.CreateBuilder`, then reconfigured via `UseSerilog` reading from config. Add environment-specific sinks (e.g. Seq in production); request logging via `UseSerilogRequestLogging()`.
 - **API docs**: Swagger/Swashbuckle, enabled only in `Development`.
-- **CORS**: a single default policy, `AllowAnyOrigin`, explicit allowed headers/methods — permissive by design since auth is enforced via bearer token, not cookies/origin.
-- **Config**: connection string and OIDC `Authority`/`Audience` live in `appsettings.json` (dev defaults committed) and are overridden per environment (`appsettings.Production.json`, environment variables in the container).
+- **CORS**: an explicit policy; `AllowAnyOrigin` is acceptable when auth is enforced via bearer token rather than cookies/origin.
+- **Rate limiting**: public, unauthenticated endpoints must be protected by a rate limiter (e.g. ASP.NET Core's built-in fixed-window limiter), keyed by client IP, with limits from config and structured logging on rejection.
+- **Privacy**: don't persist raw PII (e.g. IP addresses) for data that doesn't need it — hash/fingerprint it instead (e.g. for unique-visitor analytics).
+- **Config**: connection strings and auth `Authority`/`Audience` live in `appsettings.json` (dev defaults committed) and are overridden per environment (`appsettings.Production.json`, environment variables in the container). Never commit production secrets.
+
+### Testing
+
+Two-tier strategy, matched to the layer:
+
+- **Core/application logic** is tested against hand-written fakes for each output port (in-memory repository, static clock, static generators, etc.) — no mocking framework, fast, behavior-focused.
+- **Infra-layer adapters/decorators** are tested with a mocking framework (e.g. NSubstitute) against the interface they decorate or call — mocking is reserved for verifying interaction with a wrapped collaborator, not for core business logic.
+- Every backend project ships with test project(s) from day one; don't defer test infrastructure to "later."
 
 ---
 
@@ -63,38 +86,38 @@ Controllers  →  Repositories  →  Data (DbContext)  →  Models (EF entities)
 ### Layers
 
 ```
-components/  →  store/useFinanceStore (Zustand)  →  api.ts (fetch client)  →  types.ts
+components/  →  store/use{Domain}Store (Zustand)  →  api.ts (fetch client)  →  types.ts
 ```
 
-- **`types.ts`** — one class per domain entity (`Account`, `JournalEntry`, `JournalLine`, `BankMovement`). Classes (not plain interfaces) so that raw JSON from the API can be re-hydrated into typed instances via `new Account(data)` — constructors accept a plain data object and assign fields 1:1. `JournalEntry`'s constructor recursively wraps `lines` in `JournalLine` instances if they aren't already.
-- **`api.ts`** — a single `api` object, namespaced per resource (`api.accounts`, `api.journalEntries`, `api.bankMovements`), each exposing `getAll/create/update/delete`. Conventions:
+- **`types.ts`** — one class per domain entity. Classes (not plain interfaces) so that raw JSON from the API can be re-hydrated into typed instances via `new Entity(data)` — constructors accept a plain data object and assign fields 1:1. Nested entities are recursively wrapped in their own class if they aren't already instances.
+- **`api.ts`** — a single `api` object, namespaced per resource (`api.<resource>`), each exposing `getAll/create/update/delete`. Conventions:
   - Plain `fetch` wrapped in a shared `handleResponse` that throws on non-OK responses.
   - Auth token is module-level state (`_accessToken`) set via `setAccessToken()` from `App.tsx` whenever the OIDC user changes — not read from a context/hook inside `api.ts`.
   - Every response is mapped back into the corresponding `types.ts` class before being returned, so nothing above this layer touches raw JSON.
   - Base URL comes from `VITE_API_URL` (build-time env var via Vite's `define`).
-- **`store/useFinanceStore.ts`** — single global Zustand store holding all domain state (`accounts`, `journalEntries`, `bankMovements`, `isLoading`, `error`). No slices/multiple stores. Conventions:
-  - One `fetchData()` that loads all three collections in parallel via `Promise.all` and is called once on auth.
-  - Every mutating action (`addX`/`updateX`/`deleteX`) calls the `api` client first, then updates local state optimistically-after-confirmation (i.e., state is updated from the server response / merged patch only after the await resolves, not before).
-  - Components read state and call actions directly via the `useFinanceStore()` hook — no selectors, no memoized selector hooks.
-- **`components/`** — flat directory, one file per screen/feature (`Dashboard`, `BankStatement`, `Spaces`, `Entities`, `Journal`, `ChartOfAccounts`) plus modals (`EditJournalEntryModal`, `IdentifyModal`, `PayFromSpaceModal`, `ReserveModal`) and `ImportCSV`. No further subdivision (no `components/dashboard/`, no shared `ui/` primitives directory) — small inline components (e.g. `StatCard`, `SectionHeader` in `Dashboard.tsx`) are defined locally inside the screen that uses them rather than extracted.
-- **`App.tsx`** — owns routing (`react-router-dom`, `BrowserRouter`), the auth gate, and any state that's derived across multiple domain collections (e.g. `treasuryMetrics`, computed with `useMemo` over `accounts` + `journalEntries`). Route components receive derived data as props rather than recomputing it themselves.
+- **`store/use{Domain}Store.ts`** — single global Zustand store holding all domain state plus `isLoading`/`error`. No slices/multiple stores unless the domain genuinely has independent state machines. Conventions:
+  - One `fetchData()` that loads all collections in parallel via `Promise.all`, called once on auth.
+  - Every mutating action (`addX`/`updateX`/`deleteX`) calls the `api` client first, then updates local state from the server response/merged patch only after the await resolves — not optimistically before.
+  - Components read state and call actions directly via the store hook — no selectors, no memoized selector hooks, unless a specific performance problem justifies it.
+- **`components/`** — flat directory, one file per screen/feature plus modals. No further subdivision (no per-feature subfolders, no shared `ui/` primitives directory) unless the component count genuinely warrants it — small inline components used only by one screen are defined locally inside that screen rather than extracted.
+- **`App.tsx`** — owns routing (`react-router-dom`, `BrowserRouter`), the auth gate, and any state that's derived across multiple domain collections (computed with `useMemo`). Route components receive derived data as props rather than recomputing it themselves.
 - **`main.tsx`** — app entry point; wraps `<App />` in `<AuthProvider>` (react-oidc-context) with OIDC config inlined here (not in a separate config file).
 
 ### Conventions
 
 - **Auth**: `react-oidc-context`. `App.tsx` redirects to `signinRedirect()` whenever the user isn't authenticated and isn't on `/callback`; the access token is pushed into `api.ts` via `setAccessToken` on every auth state change.
-- **Routing**: `react-router-dom` v7, all routes declared flat in `App.tsx`'s `<Routes>`, wrapped in a single `<Layout>` that renders the sidebar/header chrome. Unknown routes redirect to `/`.
+- **Routing**: `react-router-dom`, all routes declared flat in `App.tsx`'s `<Routes>`, wrapped in a single `<Layout>` that renders shared chrome. Unknown routes redirect to `/`.
 - **State management**: Zustand only; no React Context for domain data, no server-state library (React Query, SWR, etc.) — the store itself is the cache, refreshed via explicit `fetchData()`/mutation calls.
-- **Styling**: Tailwind CSS v4, configured via `@theme` in `index.css` (no `tailwind.config.js` — v4-style CSS-first config). All colors are theme tokens (`bg-background`, `text-text-secondary`, `primary-orange`, `primary-green`, `error`, etc.) — never raw hex/Tailwind palette classes in components. Shared visual primitives are CSS utility classes in `index.css` (`.financial-card`, `.numeric`, `.positive/.negative/.warning`) rather than React components.
-- **Formatting**: money and percentages are formatted inline with `Intl.NumberFormat('es-ES', ...)` per component (no shared formatting util) — UI copy is in Spanish throughout.
+- **Styling**: Tailwind CSS v4, configured via `@theme` in `index.css` (no `tailwind.config.js` — v4-style CSS-first config). All colors are theme tokens — never raw hex/Tailwind palette classes in components. Shared visual primitives are CSS utility classes in `index.css` rather than React components.
+- **Formatting**: locale-appropriate formatting (currency, percentages, dates) done inline with `Intl.NumberFormat`/`Intl.DateTimeFormat` per component, using the target market's locale — no shared formatting util unless the same format is needed in 3+ places.
 - **Component structure**: function components, props typed via a local `interface XProps`, no default exports except screen-level components matching their route.
-- **TypeScript**: `strict` mode is not enabled in `tsconfig.json` — type-checking is best-effort (`npm run lint` = `tsc --noEmit`), not enforced strictly. `@/*` path alias maps to the frontend root.
-- **Config**: environment-driven via Vite `loadEnv`/`define`, primarily `VITE_API_URL`. OIDC client config is hardcoded in `main.tsx` (not environment-driven).
+- **TypeScript**: enable `strict` mode in `tsconfig.json` for new projects; type-checking (`tsc --noEmit`) should be enforced, not best-effort. `@/*` path alias maps to the frontend root.
+- **Config**: environment-driven via Vite `loadEnv`/`define`, primarily `VITE_API_URL`. OIDC client config is hardcoded in `main.tsx` (not environment-driven) unless multiple environments require different OIDC clients.
 
 ---
 
 ## Cross-cutting / deployment
 
-- **CI/CD**: two independent GitHub Actions workflows (`backend-deploy.yml`, `frontend-deploy.yml`), path-filtered so each only runs when its own directory changes. Both: build → (backend also runs `dotnet test`) → build a Docker image → push to GHCR (`ghcr.io/ne2-studio/cashclarity-{backend,frontend}`) → trigger a Coolify webhook to deploy.
+- **CI/CD**: two independent GitHub Actions workflows (`backend-deploy.yml`, `frontend-deploy.yml`), path-filtered so each only runs when its own directory changes. Both: build → (backend also runs `dotnet test`) → build a Docker image → push to a container registry (e.g. GHCR) → trigger a deploy webhook.
 - **Containers**: backend is a multi-stage .NET SDK→ASP.NET runtime image exposing port 8080. Frontend is built by Vite in CI, then the static `dist/` is copied into an `nginx:alpine` image (port 80) with a minimal SPA-fallback `nginx.conf` (`try_files $uri $uri/ /index.html`).
-- **No shared package/types** between frontend and backend — DTO shapes are duplicated by hand (`Domain/Finance.cs` records vs. `types.ts` classes) and must be kept in sync manually.
+- **No shared package/types** between frontend and backend — DTO shapes are duplicated by hand (backend DTOs vs. `types.ts` classes) and must be kept in sync manually, unless a project specifically justifies a shared-types package.
