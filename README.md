@@ -1,5 +1,15 @@
 # CashClarity
 
+## Verification
+
+Canonical entrypoint:
+
+```bash
+./scripts/verify all
+```
+
+See [`docs/architecture/testing.md`](docs/architecture/testing.md).
+
 A personal treasury management app built on double-entry accounting. It separates your real bank balance into a pool of named "spaces" (budget buckets) so you always know how much cash is truly available versus already committed.
 
 ## Features

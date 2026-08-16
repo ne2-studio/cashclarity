@@ -1,0 +1,12 @@
+services:
+  api-lite:
+    image: ${API_LITE_IMAGE:-cashclarity-api-lite:local}
+    ports:
+      - "5051:8080"
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-cashclarity-frontend:local}
+    ports:
+      - "3000:80"
+    depends_on:
+      - api-lite

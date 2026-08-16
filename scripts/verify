@@ -1,0 +1,228 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RUN_ID="$(date -u +%Y%m%d%H%M%S)-$$"
+
+created_images=()
+capture_tmp_files=()
+build_images=1
+changed_mode=0
+
+usage() {
+  cat <<'EOF'
+Usage: ./scripts/verify [options] <command>
+
+Options:
+  --changed             Use changed-file mode where supported.
+  --build-images        Build images needed by acceptance commands. Default.
+  --skip-image-build    Reuse already-built images.
+
+Commands:
+  backend               Restore, Release build, and unit tests.
+  backend-persistence   Repository tests against real Postgres via Testcontainers.
+  backend-acceptance    Black-box tests against the built backend image.
+  frontend              Typecheck, build, Vitest unit tests, Storybook executable specs.
+  frontend-acceptance   Playwright visual acceptance against frontend + api-lite images.
+  all                   Run every command above.
+
+Environment:
+  BACKEND_IMAGE          Defaults to cashclarity-api:verify-<run>.
+  FRONTEND_IMAGE         Defaults to cashclarity-frontend:verify-<run>.
+  API_LITE_IMAGE         Defaults to cashclarity-api-lite:verify-<run>.
+  KEEP_VERIFY_IMAGES=1   Keep images built by this script.
+  VERIFY_COVERAGE=1      Run coverage for unit checks.
+  VERIFY_NPM_CI=1        Force npm ci before Node checks.
+  VERIFY_VERBOSE=1       Stream command output live.
+EOF
+}
+
+log() { printf '\n==> %s\n' "$*"; }
+die() { printf 'verify: %s\n' "$*" >&2; exit 1; }
+need() { command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"; }
+
+run_capture() {
+  local label="$1"
+  shift
+  log "$label"
+
+  if [[ "${VERIFY_VERBOSE:-}" == "1" ]]; then
+    "$@"
+    return 0
+  fi
+
+  local tmp status start end
+  tmp="$(mktemp "${TMPDIR:-/tmp}/verify-XXXXXX.log")"
+  capture_tmp_files+=("$tmp")
+  start=$(date +%s)
+  if "$@" >"$tmp" 2>&1; then status=0; else status=$?; fi
+  end=$(date +%s)
+
+  if [[ $status -eq 0 ]]; then
+    printf '    ok (%ss)\n' "$((end - start))"
+    rm -f "$tmp"
+  else
+    printf '    FAILED (%ss, exit %s) - output:\n\n' "$((end - start))" "$status"
+    cat "$tmp"
+    rm -f "$tmp"
+    die "command failed: $label"
+  fi
+}
+
+run() { run_capture "$*" "$@"; }
+run_in() {
+  local dir="$1"
+  shift
+  run_capture "($dir) $*" env -C "$ROOT_DIR/$dir" "$@"
+}
+
+ensure_root() {
+  [[ -f "$ROOT_DIR/backend/CashClarity.slnx" ]] || die "cannot locate backend solution"
+  [[ -f "$ROOT_DIR/frontend/package.json" ]] || die "cannot locate frontend package"
+}
+
+ensure_npm_deps() {
+  local dir="$1"
+  local node_modules="$ROOT_DIR/$dir/node_modules"
+  local hidden_lock="$node_modules/.package-lock.json"
+  if [[ "${VERIFY_NPM_CI:-}" == "1" || ! -d "$node_modules" || ! -f "$hidden_lock" || "$ROOT_DIR/$dir/package-lock.json" -nt "$hidden_lock" ]]; then
+    run_in "$dir" npm ci
+  fi
+}
+
+docker_build_fresh() {
+  local tag="$1"
+  shift
+  need docker
+  docker image rm -f "$tag" >/dev/null 2>&1 || true
+  run docker build -t "$tag" "$@"
+  created_images+=("$tag")
+}
+
+require_image() {
+  local tag="$1"
+  need docker
+  docker image inspect "$tag" >/dev/null 2>&1 || die "required image not found: $tag"
+}
+
+cleanup() {
+  local status=$?
+  set +e
+  [[ ${#capture_tmp_files[@]} -gt 0 ]] && rm -f "${capture_tmp_files[@]}"
+  if [[ "${KEEP_VERIFY_IMAGES:-}" != "1" && ${#created_images[@]} -gt 0 ]]; then
+    for image in "${created_images[@]}"; do
+      log "Removing verification image $image"
+      docker image rm -f "$image" >/dev/null 2>&1 || true
+    done
+  fi
+  exit "$status"
+}
+trap cleanup EXIT
+
+warn_backend_changed_runs_full() {
+  [[ "$changed_mode" == "1" ]] || return 0
+  log "--changed: dotnet checks run in full"
+}
+
+backend() {
+  need dotnet
+  warn_backend_changed_runs_full
+  run dotnet restore "$ROOT_DIR/backend/CashClarity.slnx"
+  run dotnet build "$ROOT_DIR/backend/CashClarity.slnx" --configuration Release --no-restore
+  if [[ "${VERIFY_COVERAGE:-}" == "1" ]]; then
+    run dotnet test "$ROOT_DIR/backend/CashClarity.slnx" --configuration Release --no-build --collect:"XPlat Code Coverage" --results-directory "$ROOT_DIR/backend/coverage"
+  else
+    run dotnet test "$ROOT_DIR/backend/CashClarity.slnx" --configuration Release --no-build
+  fi
+}
+
+backend_persistence() {
+  need dotnet
+  need docker
+  warn_backend_changed_runs_full
+  run dotnet test "$ROOT_DIR/backend/CashClarity.Api.PersistenceTests/CashClarity.Api.PersistenceTests.csproj"
+}
+
+backend_acceptance() {
+  need dotnet
+  need docker
+  local image="${BACKEND_IMAGE:-cashclarity-api:verify-$RUN_ID}"
+  if [[ "$build_images" == "1" ]]; then
+    docker_build_fresh "$image" "$ROOT_DIR/backend"
+  else
+    require_image "$image"
+  fi
+  run env BACKEND_IMAGE="$image" dotnet test "$ROOT_DIR/backend/acceptance-tests/CashClarity.AcceptanceTests.slnx"
+}
+
+frontend() {
+  need npm
+  ensure_npm_deps frontend
+  run_in frontend npm run typecheck
+  run_in frontend npm run build
+  if [[ "${VERIFY_COVERAGE:-}" == "1" ]]; then
+    run_in frontend npm run test:coverage
+  elif [[ "$changed_mode" == "1" ]]; then
+    run_in frontend npm run test:changed
+  else
+    run_in frontend npm test
+  fi
+  run_in frontend npx playwright install chromium
+  if [[ "$changed_mode" == "1" ]]; then
+    run_in frontend npm run test:storybook:changed
+  else
+    run_in frontend npm run test:storybook
+  fi
+}
+
+frontend_acceptance() {
+  need npm
+  need docker
+  local frontend_image="${FRONTEND_IMAGE:-cashclarity-frontend:verify-$RUN_ID}"
+  local api_lite_image="${API_LITE_IMAGE:-cashclarity-api-lite:verify-$RUN_ID}"
+
+  ensure_npm_deps frontend
+  run docker compose -f "$ROOT_DIR/docker-compose.lite.yml" down -v --remove-orphans
+  if [[ "$build_images" == "1" ]]; then
+    run_in frontend env VITE_AUTH_DISABLED=true VITE_API_URL=http://localhost:5051/server npm run build
+    docker_build_fresh "$frontend_image" "$ROOT_DIR/frontend"
+    docker_build_fresh "$api_lite_image" -f "$ROOT_DIR/backend/CashClarity.Api.Lite/Dockerfile" "$ROOT_DIR/backend"
+  else
+    require_image "$frontend_image"
+    require_image "$api_lite_image"
+  fi
+
+  run_in frontend npx playwright install chromium
+  run_in frontend env FRONTEND_IMAGE="$frontend_image" API_LITE_IMAGE="$api_lite_image" npm run test:acceptance
+}
+
+all() {
+  backend
+  backend_persistence
+  backend_acceptance
+  frontend
+  frontend_acceptance
+}
+
+ensure_root
+
+while [[ "${1:-}" == --* ]]; do
+  case "$1" in
+    --changed) changed_mode=1; shift ;;
+    --build-images) build_images=1; shift ;;
+    --skip-image-build) build_images=0; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) usage >&2; die "unknown option: $1" ;;
+  esac
+done
+
+case "${1:-}" in
+  backend) backend ;;
+  backend-persistence) backend_persistence ;;
+  backend-acceptance) backend_acceptance ;;
+  frontend) frontend ;;
+  frontend-acceptance) frontend_acceptance ;;
+  all) all ;;
+  -h|--help|help|"") usage ;;
+  *) usage >&2; die "unknown command: $1" ;;
+esac

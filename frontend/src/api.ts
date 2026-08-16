@@ -1,6 +1,6 @@
 import { Account, JournalEntry, BankMovement } from './types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:54321/';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:54321/server').replace(/\/$/, '');
 
 let _accessToken: string | undefined;
 
@@ -10,7 +10,7 @@ export function setAccessToken(token: string | undefined) {
 
 const getHeaders = (): Record<string, string> => ({
   'Content-Type': 'application/json',
-  'Authorization': `Bearer ${_accessToken}`,
+  ...(typeof _accessToken === 'string' ? { 'Authorization': `Bearer ${_accessToken}` } : {}),
 });
 
 const handleResponse = async (res: Response) => {

@@ -1,3 +1,5 @@
 <Solution>
   <Project Path="CashClarity.Api/CashClarity.Api.csproj" />
+  <Project Path="CashClarity.Api.Lite/CashClarity.Api.Lite.csproj" />
+  <Project Path="CashClarity.Api.Tests/CashClarity.Api.Tests.csproj" />
 </Solution>

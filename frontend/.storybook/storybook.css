@@ -1,0 +1,7 @@
+body {
+  background: #0d0f12;
+}
+
+#storybook-root {
+  min-height: 100vh;
+}

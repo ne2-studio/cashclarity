@@ -13,27 +13,30 @@ import { useAuth } from "react-oidc-context";
 import { setAccessToken } from './api';
 
 export default function App() {
+  const authDisabled = import.meta.env.VITE_AUTH_DISABLED === 'true';
   const auth = useAuth();
   const { accounts, journalEntries, fetchData, isLoading, error } = useFinanceStore();
 
   useEffect(() => {
-    setAccessToken(auth.user?.access_token);
-  }, [auth.user]);
+    setAccessToken(authDisabled ? 'acceptance-token' : auth.user?.access_token);
+  }, [authDisabled, auth.user]);
 
   useEffect(() => {
+    if (authDisabled) return;
     const isCallback = window.location.pathname === "/callback";
     if (!auth.isLoading && !auth.isAuthenticated && !isCallback) {
       auth.signinRedirect();
     }
-  }, [auth.isLoading, auth.isAuthenticated]);
+  }, [authDisabled, auth.isLoading, auth.isAuthenticated]);
 
   useEffect(() => {
-    if (auth.isAuthenticated) {
+    if (authDisabled || auth.isAuthenticated) {
       fetchData();
     }
-  }, [auth.isAuthenticated]);
+  }, [authDisabled, auth.isAuthenticated]);
 
   const handleLogout = async () => {
+    if (authDisabled) return;
     await auth.signoutRedirect();
   };
 
@@ -67,7 +70,7 @@ export default function App() {
     };
   }, [accounts, journalEntries]);
 
-  if (auth.isLoading || !auth.isAuthenticated) {
+  if (!authDisabled && (auth.isLoading || !auth.isAuthenticated)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">

@@ -20,7 +20,7 @@ builder.Services.AddCors(options =>
 
 var databaseUrl = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<FinanceDbContext>(opts => opts.UseNpgsql(databaseUrl));
-builder.Services.AddScoped<FinanceRepository>();
+builder.Services.AddScoped<IFinanceRepository, FinanceRepository>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -50,6 +50,7 @@ builder.Services.AddAuthentication(options =>
 {
     options.Authority = builder.Configuration["Auth:Authority"];
     options.Audience = builder.Configuration["Auth:Audience"];
+    options.RequireHttpsMetadata = builder.Configuration.GetValue("Auth:RequireHttpsMetadata", true);
 });
 
 var app = builder.Build();
@@ -85,8 +86,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors();
 
+app.UseAuthentication();
 app.UseAuthorization();
 app.UseSerilogRequestLogging();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program;

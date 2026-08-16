@@ -9,13 +9,14 @@ namespace CashClarity.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("server")]
-public class FinanceController(FinanceRepository repo) : ControllerBase
+public class FinanceController(IFinanceRepository repo) : ControllerBase
 {
     private string UserId =>
         User.FindFirst(ClaimTypes.NameIdentifier)?.Value
         ?? throw new UnauthorizedAccessException("Missing user id claim");
 
     [HttpGet("health")]
+    [AllowAnonymous]
     public IActionResult GetHealth()
     {
         return Ok(new { status = "ok" });

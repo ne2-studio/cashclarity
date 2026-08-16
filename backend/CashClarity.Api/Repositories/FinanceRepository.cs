@@ -5,7 +5,23 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CashClarity.Api.Repositories;
 
-public class FinanceRepository(FinanceDbContext db)
+public interface IFinanceRepository
+{
+    Task<List<AccountResponse>> GetAccounts(string userId);
+    Task<AccountResponse> AddAccount(AccountCreateRequest req, string userId);
+    Task UpdateAccount(string id, AccountPatchRequest patch, string userId);
+    Task DeleteAccount(string id, string userId);
+    Task<List<JournalEntryResponse>> GetJournalEntries(string userId);
+    Task<JournalEntryResponse> AddJournalEntry(JournalEntryCreateRequest req, string userId);
+    Task UpdateJournalEntry(string id, JournalEntryPatchRequest patch, string userId);
+    Task DeleteJournalEntry(string id, string userId);
+    Task<List<BankMovementResponse>> GetBankMovements(string userId);
+    Task<BankMovementResponse> AddBankMovement(BankMovementCreateRequest req, string userId);
+    Task UpdateBankMovement(string id, BankMovementPatchRequest patch, string userId);
+    Task DeleteBankMovement(string id, string userId);
+}
+
+public class FinanceRepository(FinanceDbContext db) : IFinanceRepository
 {
     private static readonly (string Code, string Name, string Type)[] SystemAccounts =
     [
