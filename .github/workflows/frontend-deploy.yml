@@ -5,7 +5,12 @@ on:
     branches:
       - main
     paths:
+      - '.github/workflows/frontend-deploy.yml'
       - 'frontend/**'
+      - 'backend/CashClarity.Api/**'
+      - 'backend/CashClarity.Api.Lite/**'
+      - 'scripts/**'
+      - 'docker-compose.lite.yml'
 
 permissions:
   contents: read
@@ -13,10 +18,6 @@ permissions:
 
 env:
   IMAGE_NAME: ghcr.io/ne2-studio/cashclarity-frontend
-
-defaults:
-  run:
-    working-directory: frontend
 
 jobs:
   build-and-deploy:
@@ -35,21 +36,48 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
+        working-directory: frontend
         run: npm ci
 
-      - name: Build Vite app
-        run: npm run build
-        env:
-          VITE_API_URL: ${{ vars.VITE_API_URL }}
+      - name: Build/test browser setup
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Build/test frontend
+        run: VERIFY_COVERAGE=1 ./scripts/verify frontend
 
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
+      - name: Build Vite app for image
+        working-directory: frontend
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+
       - name: Build image
-        run: docker build -t $IMAGE_NAME:latest .
+        run: docker build -t $IMAGE_NAME:latest frontend
+
+      - name: Package acceptance API image
+        run: docker build -f backend/CashClarity.Api.Lite/Dockerfile -t cashclarity-api-lite:ci backend
+
+      - name: Verify packaged frontend
+        env:
+          FRONTEND_IMAGE: ${{ env.IMAGE_NAME }}:latest
+          API_LITE_IMAGE: cashclarity-api-lite:ci
+          KEEP_VERIFY_IMAGES: "1"
+        run: ./scripts/verify --skip-image-build frontend-acceptance
 
       - name: Push image
         run: docker push $IMAGE_NAME:latest
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
 
       - name: Trigger Coolify deploy
         run: |

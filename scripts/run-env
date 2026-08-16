@@ -1,0 +1,379 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+STATE_DIR="$ROOT_DIR/.run"
+LOG_DIR="$STATE_DIR/logs"
+VITE_PID="$STATE_DIR/frontend-vite.pid"
+BACKEND_PID="$STATE_DIR/backend-dev.pid"
+VITE_LOG="$LOG_DIR/frontend-vite.log"
+BACKEND_LOG="$LOG_DIR/backend-dev.log"
+POSTGRES_CONTAINER="cashclarity-run-postgres"
+API_LITE_IMAGE="${API_LITE_IMAGE:-cashclarity-api-lite:run-dev}"
+FRONTEND_IMAGE="${FRONTEND_IMAGE:-cashclarity-frontend:run-dev}"
+
+usage() {
+  cat <<'EOF'
+Usage: ./scripts/run-env <command>
+
+Commands:
+  frontend-dev   api-lite in Docker, frontend from Vite on port 5173.
+  backend-dev    Postgres in Docker, backend from local dotnet on port 5050.
+  full-stack     packaged frontend and api-lite in Docker.
+  logs [mode] [component]
+                 show recent logs for a mode, optionally narrowed to a component.
+  cleanup        stop local dev processes and stacks started by this helper.
+EOF
+}
+
+die() {
+  printf 'run-env: %s\n' "$*" >&2
+  exit 1
+}
+
+need() {
+  command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
+}
+
+ensure_dirs() {
+  mkdir -p "$LOG_DIR"
+}
+
+port_in_use() {
+  local port="$1"
+
+  if docker ps --format '{{.Names}} {{.Ports}}' | grep -Eq "(^|[ ,])([0-9.]+:|\\[::\\]:)?$port->"; then
+    return 0
+  fi
+
+  if command -v ss >/dev/null 2>&1 && ss -ltn | awk '{print $4}' | grep -Eq "(:|\\])$port$"; then
+    return 0
+  fi
+
+  return 1
+}
+
+docker_port_owned_by() {
+  local port="$1"
+  shift
+  local name
+
+  for name in "$@"; do
+    if docker ps --format '{{.Names}} {{.Ports}}' |
+      grep -F "$name" |
+      grep -Eq "(^|[ ,])([0-9.]+:|\\[::\\]:)?$port->"; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+require_port_free() {
+  local port="$1"
+  local purpose="$2"
+
+  if port_in_use "$port"; then
+    die "$purpose port $port is already in use; run './scripts/run-env cleanup' or stop the conflicting process"
+  fi
+}
+
+require_port_free_unless_owned() {
+  local port="$1"
+  local purpose="$2"
+  shift 2
+
+  if port_in_use "$port" && ! docker_port_owned_by "$port" "$@"; then
+    die "$purpose port $port is already in use by an unexpected process"
+  fi
+}
+
+pid_alive() {
+  local pid_file="$1"
+  [[ -f "$pid_file" ]] || return 1
+  local pid
+  pid="$(cat "$pid_file")"
+  [[ -n "$pid" ]] && kill -0 "$pid" >/dev/null 2>&1
+}
+
+stop_pid() {
+  local pid_file="$1"
+  [[ -f "$pid_file" ]] || return 0
+
+  local pid
+  pid="$(cat "$pid_file")"
+  if [[ -n "$pid" ]] && kill -0 "$pid" >/dev/null 2>&1; then
+    kill "$pid" >/dev/null 2>&1 || true
+    for _ in {1..20}; do
+      kill -0 "$pid" >/dev/null 2>&1 || break
+      sleep 0.2
+    done
+    kill -9 "$pid" >/dev/null 2>&1 || true
+  fi
+  rm -f "$pid_file"
+}
+
+wait_http() {
+  local url="$1"
+  local timeout_seconds="$2"
+  local label="$3"
+  local deadline=$((SECONDS + timeout_seconds))
+
+  until curl -fs --max-time 2 "$url" >/dev/null 2>&1; do
+    if (( SECONDS >= deadline )); then
+      die "$label did not become ready at $url within ${timeout_seconds}s"
+    fi
+    sleep 1
+  done
+}
+
+wait_postgres() {
+  local deadline=$((SECONDS + 60))
+
+  until docker exec "$POSTGRES_CONTAINER" pg_isready -U devuser -d cashclarity >/dev/null 2>&1; do
+    if (( SECONDS >= deadline )); then
+      die "Postgres did not become ready within 60s"
+    fi
+    sleep 1
+  done
+}
+
+ensure_npm_deps() {
+  local dir="$1"
+  local node_modules="$ROOT_DIR/$dir/node_modules"
+  local hidden_lock="$node_modules/.package-lock.json"
+
+  if [[ ! -d "$node_modules" || ! -f "$hidden_lock" || "$ROOT_DIR/$dir/package-lock.json" -nt "$hidden_lock" ]]; then
+    (cd "$ROOT_DIR/$dir" && npm ci)
+  fi
+}
+
+build_api_lite() {
+  docker build -f "$ROOT_DIR/backend/CashClarity.Api.Lite/Dockerfile" -t "$API_LITE_IMAGE" "$ROOT_DIR/backend"
+}
+
+reconcile_frontend_dev() {
+  stop_pid "$BACKEND_PID"
+  docker rm -f "$POSTGRES_CONTAINER" >/dev/null 2>&1 || true
+  docker compose -f "$ROOT_DIR/docker-compose.lite.yml" down --remove-orphans >/dev/null 2>&1 || true
+}
+
+reconcile_backend_dev() {
+  stop_pid "$VITE_PID"
+  docker compose -f "$ROOT_DIR/docker-compose.lite.yml" down --remove-orphans >/dev/null 2>&1 || true
+}
+
+reconcile_full_stack() {
+  stop_pid "$VITE_PID"
+  stop_pid "$BACKEND_PID"
+  docker rm -f "$POSTGRES_CONTAINER" >/dev/null 2>&1 || true
+}
+
+print_frontend_dev() {
+  cat <<EOF
+Mode: frontend-dev
+Frontend: http://localhost:5173
+Backend: http://localhost:5051
+Frontend source: Vite frontend/ source with hot reload
+Backend source: Docker image $API_LITE_IMAGE
+Docker components: api-lite
+Development components: frontend Vite dev server
+Health: ready
+Test user: fake bearer accepted by api-lite
+Logs:
+  all: ./scripts/run-env logs frontend-dev
+  frontend: ./scripts/run-env logs frontend-dev frontend
+  backend: ./scripts/run-env logs frontend-dev backend
+Cleanup: ./scripts/run-env cleanup
+EOF
+}
+
+print_backend_dev() {
+  cat <<'EOF'
+Mode: backend-dev
+Frontend: none
+Backend: http://localhost:5050
+Frontend source: none
+Backend source: local backend/CashClarity.Api via dotnet run
+Docker components: postgres
+Development components: backend
+Health: ready
+Test user: none; real API uses configured JWT authority
+Logs:
+  all: ./scripts/run-env logs backend-dev
+  backend: ./scripts/run-env logs backend-dev backend
+  infra: ./scripts/run-env logs backend-dev infra
+Cleanup: ./scripts/run-env cleanup
+EOF
+}
+
+print_full_stack() {
+  cat <<EOF
+Mode: full-stack
+Frontend: http://localhost:3000
+Backend: http://localhost:5051
+Frontend source: Docker image $FRONTEND_IMAGE
+Backend source: Docker image $API_LITE_IMAGE
+Docker components: frontend, api-lite
+Development components: none
+Health: ready
+Test user: fake bearer accepted by api-lite
+Logs:
+  all: ./scripts/run-env logs full-stack
+  frontend: ./scripts/run-env logs full-stack frontend
+  backend: ./scripts/run-env logs full-stack backend
+Cleanup: ./scripts/run-env cleanup
+EOF
+}
+
+frontend_dev() {
+  need docker
+  need npm
+  need curl
+  ensure_dirs
+  reconcile_frontend_dev
+
+  require_port_free_unless_owned 5051 "api-lite" cashclarity-api-lite-1
+  if ! pid_alive "$VITE_PID"; then
+    require_port_free 5173 "Vite frontend"
+  fi
+
+  build_api_lite
+  API_LITE_IMAGE="$API_LITE_IMAGE" docker compose -f "$ROOT_DIR/docker-compose.lite.yml" up -d api-lite
+  wait_http "http://localhost:5051/server/health" 120 "api-lite"
+
+  ensure_npm_deps frontend
+  if ! pid_alive "$VITE_PID"; then
+    (
+      cd "$ROOT_DIR/frontend"
+      nohup env \
+        VITE_AUTH_DISABLED="true" \
+        VITE_API_URL="http://localhost:5051/server" \
+        npx vite --port=5173 --host=0.0.0.0 >"$VITE_LOG" 2>&1 &
+      echo $! >"$VITE_PID"
+    )
+  fi
+
+  wait_http "http://localhost:5173" 60 "Vite frontend"
+  print_frontend_dev
+}
+
+backend_dev() {
+  need docker
+  need dotnet
+  need curl
+  ensure_dirs
+  reconcile_backend_dev
+
+  require_port_free_unless_owned 5432 "postgres" "$POSTGRES_CONTAINER"
+  if ! pid_alive "$BACKEND_PID"; then
+    require_port_free 5050 "backend"
+  fi
+
+  if ! docker ps --format '{{.Names}}' | grep -Fx "$POSTGRES_CONTAINER" >/dev/null 2>&1; then
+    docker rm -f "$POSTGRES_CONTAINER" >/dev/null 2>&1 || true
+    docker run -d \
+      --name "$POSTGRES_CONTAINER" \
+      -e POSTGRES_DB=cashclarity \
+      -e POSTGRES_USER=devuser \
+      -e POSTGRES_PASSWORD=devpass \
+      -p 5432:5432 \
+      postgres:17-alpine >/dev/null
+  fi
+  wait_postgres
+
+  if ! pid_alive "$BACKEND_PID"; then
+    (
+      cd "$ROOT_DIR/backend"
+      nohup env \
+        ASPNETCORE_ENVIRONMENT=Development \
+        ASPNETCORE_URLS=http://localhost:5050 \
+        Auth__RequireHttpsMetadata=false \
+        dotnet run --project CashClarity.Api/CashClarity.Api.csproj >"$BACKEND_LOG" 2>&1 &
+      echo $! >"$BACKEND_PID"
+    )
+  fi
+
+  wait_http "http://localhost:5050/server/health" 120 "backend"
+  print_backend_dev
+}
+
+full_stack() {
+  need docker
+  need npm
+  need curl
+  ensure_dirs
+  reconcile_full_stack
+
+  require_port_free_unless_owned 3000 "Docker frontend" cashclarity-frontend-1
+  require_port_free_unless_owned 5051 "api-lite" cashclarity-api-lite-1
+
+  build_api_lite
+  ensure_npm_deps frontend
+  (cd "$ROOT_DIR/frontend" && VITE_AUTH_DISABLED=true VITE_API_URL=http://localhost:5051/server npm run build)
+  docker build -t "$FRONTEND_IMAGE" "$ROOT_DIR/frontend"
+  FRONTEND_IMAGE="$FRONTEND_IMAGE" API_LITE_IMAGE="$API_LITE_IMAGE" docker compose -f "$ROOT_DIR/docker-compose.lite.yml" up -d api-lite frontend
+
+  wait_http "http://localhost:5051/server/health" 120 "api-lite"
+  wait_http "http://localhost:3000" 120 "frontend"
+  print_full_stack
+}
+
+logs() {
+  local mode="${1:-}"
+  local component="${2:-all}"
+  case "$mode" in
+    frontend-dev)
+      case "$component" in
+        all)
+          [[ -f "$VITE_LOG" ]] && tail -80 "$VITE_LOG" || true
+          docker compose -f "$ROOT_DIR/docker-compose.lite.yml" logs --tail=80 api-lite
+          ;;
+        frontend) [[ -f "$VITE_LOG" ]] && tail -120 "$VITE_LOG" || true ;;
+        backend) docker compose -f "$ROOT_DIR/docker-compose.lite.yml" logs --tail=120 api-lite ;;
+        *) die "unknown frontend-dev log component: $component" ;;
+      esac
+      ;;
+    backend-dev)
+      case "$component" in
+        all)
+          [[ -f "$BACKEND_LOG" ]] && tail -120 "$BACKEND_LOG" || true
+          docker logs --tail=80 "$POSTGRES_CONTAINER" 2>/dev/null || true
+          ;;
+        backend) [[ -f "$BACKEND_LOG" ]] && tail -160 "$BACKEND_LOG" || true ;;
+        infra) docker logs --tail=120 "$POSTGRES_CONTAINER" 2>/dev/null || true ;;
+        *) die "unknown backend-dev log component: $component" ;;
+      esac
+      ;;
+    full-stack)
+      case "$component" in
+        all) docker compose -f "$ROOT_DIR/docker-compose.lite.yml" logs --tail=120 api-lite frontend ;;
+        frontend) docker compose -f "$ROOT_DIR/docker-compose.lite.yml" logs --tail=160 frontend ;;
+        backend) docker compose -f "$ROOT_DIR/docker-compose.lite.yml" logs --tail=160 api-lite ;;
+        *) die "unknown full-stack log component: $component" ;;
+      esac
+      ;;
+    *)
+      die "usage: ./scripts/run-env logs <frontend-dev|backend-dev|full-stack> [component]"
+      ;;
+  esac
+}
+
+cleanup() {
+  ensure_dirs
+  stop_pid "$VITE_PID"
+  stop_pid "$BACKEND_PID"
+  docker compose -f "$ROOT_DIR/docker-compose.lite.yml" down --remove-orphans >/dev/null 2>&1 || true
+  docker rm -f "$POSTGRES_CONTAINER" >/dev/null 2>&1 || true
+  echo "Cleanup: stopped run-env processes and containers; named volumes were kept."
+}
+
+case "${1:-}" in
+  frontend-dev) frontend_dev ;;
+  backend-dev) backend_dev ;;
+  full-stack) full_stack ;;
+  logs) shift; logs "${1:-}" "${2:-all}" ;;
+  cleanup) cleanup ;;
+  -h|--help|help|"") usage ;;
+  *) usage >&2; die "unknown command: $1" ;;
+esac

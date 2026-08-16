@@ -24,6 +24,11 @@ Run from repository root:
 | `./scripts/verify frontend-acceptance` | Playwright visual suite against frontend image + API lite |
 | `./scripts/verify all` | Full local verification |
 
+GitHub Actions use the same `./scripts/verify` commands before publishing images.
+
+For manual local environments, use `./scripts/run-env`; see
+[`docs/operations/local-development.md`](../operations/local-development.md).
+
 ## Backend
 
 - Unit tests reference backend source and use the same `InMemoryFinanceRepository` that powers

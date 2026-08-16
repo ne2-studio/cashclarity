@@ -5,7 +5,10 @@ on:
     branches:
       - main
     paths:
+      - '.github/workflows/backend-deploy.yml'
       - 'backend/**'
+      - 'scripts/**'
+      - 'docker-compose.lite.yml'
 
 permissions:
   contents: read
@@ -13,10 +16,6 @@ permissions:
 
 env:
   IMAGE_NAME: ghcr.io/ne2-studio/cashclarity-backend
-
-defaults:
-  run:
-    working-directory: backend
 
 jobs:
   build-and-deploy:
@@ -30,20 +29,23 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restore dependencies
-        run: dotnet restore
+      - name: Build/test backend
+        run: VERIFY_COVERAGE=1 ./scripts/verify backend
 
-      - name: Build
-        run: dotnet build --no-restore -c Release
-
-      - name: Run tests
-        run: dotnet test --no-build -c Release
+      - name: Backend persistence tests
+        run: ./scripts/verify backend-persistence
 
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Build image
-        run: docker build -t $IMAGE_NAME:latest .
+        run: docker build -t $IMAGE_NAME:latest backend
+
+      - name: Verify packaged backend
+        env:
+          BACKEND_IMAGE: ${{ env.IMAGE_NAME }}:latest
+          KEEP_VERIFY_IMAGES: "1"
+        run: ./scripts/verify --skip-image-build backend-acceptance
 
       - name: Push image
         run: docker push $IMAGE_NAME:latest

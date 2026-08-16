@@ -10,6 +10,24 @@ Canonical entrypoint:
 
 See [`docs/architecture/testing.md`](docs/architecture/testing.md).
 
+Local environments:
+
+```bash
+./scripts/run-env frontend-dev
+./scripts/run-env backend-dev
+./scripts/run-env full-stack
+```
+
+See [`docs/operations/local-development.md`](docs/operations/local-development.md).
+
+Git hook:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Commit messages must follow Conventional Commits.
+
 A personal treasury management app built on double-entry accounting. It separates your real bank balance into a pool of named "spaces" (budget buckets) so you always know how much cash is truly available versus already committed.
 
 ## Features
@@ -86,7 +104,9 @@ The app starts on `http://localhost:3000`.
 
 ## Deployment
 
-Both services are containerized. CI/CD runs on push to `main` (path-filtered per service), builds a Docker image, pushes it to GitHub Container Registry, and triggers a Coolify deploy webhook.
+Both services are containerized. CI/CD runs on push to `main`, delegates checks to
+`./scripts/verify`, validates packaged images, pushes to GitHub Container Registry,
+and triggers Coolify deploy webhooks.
 
 ```bash
 # Build backend image
