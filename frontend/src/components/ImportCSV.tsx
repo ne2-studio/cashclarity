@@ -1,47 +1,55 @@
 import React, { useState, ChangeEvent } from 'react';
 
-import { BankMovement } from '../types';
-import { parseBankMovementsCsv } from '../hooks/csvImport';
 import { Button, Modal } from '../design-system';
+import type { BankMovementImportCommitResult, BankMovementImportPreview, BankMovementImportRow, DuplicatePolicy } from '../api';
 
 interface ImportCSVProps {
   onClose: () => void;
-  onAddBankMovement: (movement: Omit<BankMovement, 'id' | 'isIdentified'>) => Promise<BankMovement>;
+  onPreview: (file: File) => Promise<BankMovementImportPreview>;
+  onCommit: (rows: BankMovementImportRow[], duplicatePolicy?: DuplicatePolicy) => Promise<BankMovementImportCommitResult>;
 }
 
-export function ImportCSV({ onClose, onAddBankMovement }: ImportCSVProps) {
-  const [importPreview, setImportPreview] = useState<Omit<BankMovement, 'id' | 'isIdentified'>[]>([]);
+export function ImportCSV({ onClose, onPreview, onCommit }: ImportCSVProps) {
+  const [importPreview, setImportPreview] = useState<BankMovementImportPreview | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(val);
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      const result = parseBankMovementsCsv(text);
-      if ('movements' in result) {
-        setImportPreview(result.movements);
-        return;
-      }
-
-      if (result.headers) {
-        console.log('Headers detectados:', result.headers);
-        alert(`${result.error}\n\nHeaders encontrados: ${result.headers.join(', ')}`);
-      } else {
-        alert(result.error);
-      }
-    };
-    reader.readAsText(file);
+    setIsLoading(true);
+    setError(null);
+    try {
+      setImportPreview(await onPreview(file));
+    } catch (err) {
+      setImportPreview(null);
+      setError((err as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const confirmImport = () => {
-    importPreview.forEach(m => onAddBankMovement(m));
-    onClose();
+  const confirmImport = async () => {
+    if (!importPreview) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      await onCommit(importPreview.rows.filter(row => row.status !== 'invalid'), 'skip');
+      onClose();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const validCount = importPreview?.summary.valid ?? 0;
+  const duplicateCount = importPreview?.summary.duplicates ?? 0;
+  const importableCount = validCount;
 
   return (
     <Modal
@@ -51,8 +59,8 @@ export function ImportCSV({ onClose, onAddBankMovement }: ImportCSVProps) {
       footer={(
         <>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button onClick={confirmImport} disabled={importPreview.length === 0}>
-            Importar {importPreview.length > 0 ? importPreview.length : ''} Movimientos
+          <Button onClick={confirmImport} disabled={importableCount === 0 || isLoading}>
+            Importar {importableCount > 0 ? importableCount : ''} Movimientos
           </Button>
         </>
       )}
@@ -72,9 +80,11 @@ export function ImportCSV({ onClose, onAddBankMovement }: ImportCSVProps) {
                 file:bg-surface-elevated file:text-text-primary
                 hover:file:bg-border transition-all"
             />
+            {isLoading && <p className="text-[10px] text-text-secondary">Procesando CSV...</p>}
+            {error && <p className="text-[10px] text-primary-orange">{error}</p>}
           </div>
 
-          {importPreview.length > 0 && (
+          {importPreview && (
             <div className="flex flex-col gap-4">
               <div className="max-h-60 overflow-y-auto border border-border rounded-sm">
                 <table className="w-full text-left">
@@ -82,25 +92,38 @@ export function ImportCSV({ onClose, onAddBankMovement }: ImportCSVProps) {
                     <tr className="border-b border-border">
                       <th className="p-2 text-[9px] font-mono uppercase text-text-secondary">Fecha</th>
                       <th className="p-2 text-[9px] font-mono uppercase text-text-secondary">Concepto</th>
+                      <th className="p-2 text-[9px] font-mono uppercase text-text-secondary">Estado</th>
                       <th className="p-2 text-[9px] font-mono uppercase text-text-secondary text-right">Importe</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/30">
-                    {importPreview.map((m, i) => (
-                      <tr key={i}>
-                        <td className="p-2 text-[10px] font-mono text-text-secondary">{m.date}</td>
-                        <td className="p-2 text-[10px] font-medium">{m.description}</td>
-                        <td className={`p-2 text-[10px] font-mono text-right ${m.amount >= 0 ? 'text-primary-green' : 'text-primary-orange'}`}>
-                          {formatCurrency(m.amount)}
+                    {importPreview.rows.map((m) => (
+                      <tr key={m.rowNumber} className={m.status === 'invalid' || m.status === 'duplicate' ? 'opacity-60' : undefined}>
+                        <td className="p-2 text-[10px] font-mono text-text-secondary">{m.date ?? '-'}</td>
+                        <td className="p-2 text-[10px] font-medium">{m.description ?? m.errors.join(', ')}</td>
+                        <td className="p-2 text-[10px] font-mono text-text-secondary">{statusText(m)}</td>
+                        <td className={`p-2 text-[10px] font-mono text-right ${(m.amount ?? 0) >= 0 ? 'text-primary-green' : 'text-primary-orange'}`}>
+                          {typeof m.amount === 'number' ? formatCurrency(m.amount) : '-'}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <p className="text-[10px] text-text-secondary italic">Se han detectado {importPreview.length} movimientos válidos.</p>
+              <p className="text-[10px] text-text-secondary italic">
+                Se han detectado {validCount} movimientos válidos.
+                {duplicateCount > 0 ? ` ${duplicateCount} duplicados se omitiran.` : ''}
+                {importPreview.summary.invalid > 0 ? ` ${importPreview.summary.invalid} filas invalidas.` : ''}
+              </p>
             </div>
           )}
     </Modal>
   );
+}
+
+function statusText(row: BankMovementImportRow) {
+  if (row.status === 'duplicate') return 'Duplicado';
+  if (row.status === 'invalid') return 'Invalido';
+  if (row.status === 'warning') return 'Aviso';
+  return 'Valido';
 }

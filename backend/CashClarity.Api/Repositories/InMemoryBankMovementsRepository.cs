@@ -46,6 +46,24 @@ public class InMemoryBankMovementsRepository : IBankMovementsRepository
         }
     }
 
+    public Task<List<BankMovementResponse>> AddBankMovements(List<BankMovementCreateRequest> requests, string userId)
+    {
+        lock (gate)
+        {
+            var created = requests.Select(req => new BankMovementResponse(
+                Guid.NewGuid().ToString(),
+                ParseDate(req.Date),
+                req.Description,
+                req.Amount,
+                false,
+                req.EntityId,
+                req.JournalEntryId,
+                userId)).ToList();
+            bankMovements.AddRange(created);
+            return Task.FromResult(created);
+        }
+    }
+
     public Task UpdateBankMovement(string id, BankMovementPatchRequest patch, string userId)
     {
         lock (gate)

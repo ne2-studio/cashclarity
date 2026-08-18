@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Account, JournalEntry, BankMovement, JournalLine } from '../types';
-import { api } from '../api';
+import { api, type BankMovementImportCommitResult, type BankMovementImportPreview, type BankMovementImportRow, type DuplicatePolicy } from '../api';
 
 interface FinanceStore {
   accounts: Account[];
@@ -22,6 +22,8 @@ interface FinanceStore {
   updateJournalLine: (entryId: string, lineId: string, updates: Partial<JournalLine>) => Promise<void>;
   
   addBankMovement: (movement: Omit<BankMovement, 'id' | 'isIdentified'>) => Promise<BankMovement>;
+  previewBankMovementImport: (file: File) => Promise<BankMovementImportPreview>;
+  commitBankMovementImport: (rows: BankMovementImportRow[], duplicatePolicy?: DuplicatePolicy) => Promise<BankMovementImportCommitResult>;
   updateBankMovement: (id: string, updates: Partial<BankMovement>) => Promise<void>;
   deleteBankMovement: (id: string) => Promise<void>;
 }
@@ -119,6 +121,14 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
     const newMovement = await api.bankMovements.create(movement);
     set((state) => ({ bankMovements: [newMovement, ...state.bankMovements] }));
     return newMovement;
+  },
+
+  previewBankMovementImport: (file) => api.bankMovements.previewImport(file),
+
+  commitBankMovementImport: async (rows, duplicatePolicy = 'skip') => {
+    const result = await api.bankMovements.commitImport(rows, duplicatePolicy);
+    set((state) => ({ bankMovements: [...result.created, ...state.bankMovements] }));
+    return result;
   },
 
   updateBankMovement: async (id, updates) => {

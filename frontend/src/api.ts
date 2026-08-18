@@ -14,6 +14,10 @@ const getHeaders = (): Record<string, string> => ({
   ...(typeof _accessToken === 'string' ? { 'Authorization': `Bearer ${_accessToken}` } : {}),
 });
 
+const getMultipartHeaders = (): Record<string, string> => ({
+  ...(typeof _accessToken === 'string' ? { 'Authorization': `Bearer ${_accessToken}` } : {}),
+});
+
 const handleResponse = async (res: Response) => {
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: 'Unknown error' }));
@@ -87,5 +91,55 @@ export const api = {
         method: 'DELETE',
         headers: getHeaders()
       }).then(handleResponse),
+    previewImport: async (file: File): Promise<BankMovementImportPreview> => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return fetch(`${API_BASE_URL}/bank-movements/imports/preview`, {
+        method: 'POST',
+        headers: getMultipartHeaders(),
+        body: formData,
+      }).then(handleResponse);
+    },
+    commitImport: async (rows: BankMovementImportRow[], duplicatePolicy: DuplicatePolicy = 'skip'): Promise<BankMovementImportCommitResult> =>
+      fetch(`${API_BASE_URL}/bank-movements/imports`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ rows, duplicatePolicy }),
+      }).then(handleResponse).then(data => ({
+        ...data,
+        created: data.created.map((m: any) => new BankMovement(m)),
+      })),
   },
 };
+
+export type BankMovementImportRowStatus = 'valid' | 'duplicate' | 'warning' | 'invalid';
+export type DuplicatePolicy = 'skip' | 'import-anyway';
+
+export interface BankMovementImportRow {
+  rowNumber: number;
+  date?: string | null;
+  description?: string | null;
+  amount?: number | null;
+  status: BankMovementImportRowStatus;
+  duplicateOfBankMovementId?: string | null;
+  errors: string[];
+  headers?: string[] | null;
+  selected?: boolean;
+}
+
+export interface BankMovementImportPreview {
+  rows: BankMovementImportRow[];
+  summary: {
+    totalRows: number;
+    valid: number;
+    duplicates: number;
+    invalid: number;
+    warnings: number;
+  };
+}
+
+export interface BankMovementImportCommitResult {
+  created: BankMovement[];
+  skippedDuplicates: number;
+  failed: { rowNumber: number; error: string }[];
+}

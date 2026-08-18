@@ -1,6 +1,7 @@
 using CashClarity.Api.Controllers;
 using CashClarity.Api.Lite;
 using CashClarity.Api.Repositories;
+using CashClarity.Api.Services;
 using Microsoft.AspNetCore.Authentication;
 using Serilog;
 
@@ -29,6 +30,7 @@ builder.Services.AddSingleton<IJournalEntriesRepository>(services =>
         services.GetRequiredService<List<BankMovementResponse>>()));
 builder.Services.AddSingleton<IBankMovementsRepository>(services =>
     new InMemoryBankMovementsRepository(services.GetRequiredService<List<BankMovementResponse>>()));
+builder.Services.AddSingleton<IBankMovementImportService, BankMovementImportService>();
 builder.Services.AddControllers().AddApplicationPart(typeof(AccountsController).Assembly);
 builder.Services.AddEndpointsApiExplorer();
 

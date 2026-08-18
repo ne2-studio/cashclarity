@@ -1,5 +1,6 @@
 using CashClarity.Api.Data;
 using CashClarity.Api.Repositories;
+using CashClarity.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
@@ -23,6 +24,7 @@ builder.Services.AddDbContext<FinanceDbContext>(opts => opts.UseNpgsql(databaseU
 builder.Services.AddScoped<IAccountsRepository, AccountsRepository>();
 builder.Services.AddScoped<IJournalEntriesRepository, JournalEntriesRepository>();
 builder.Services.AddScoped<IBankMovementsRepository, BankMovementsRepository>();
+builder.Services.AddScoped<IBankMovementImportService, BankMovementImportService>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>

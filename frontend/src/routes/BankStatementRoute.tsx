@@ -7,6 +7,8 @@ export function BankStatementRoute() {
     bankMovements,
     journalEntries,
     addBankMovement,
+    previewBankMovementImport,
+    commitBankMovementImport,
     updateBankMovement,
     deleteBankMovement,
     addJournalEntry,
@@ -19,6 +21,8 @@ export function BankStatementRoute() {
       bankMovements={bankMovements}
       journalEntries={journalEntries}
       onAddBankMovement={addBankMovement}
+      onPreviewBankMovementImport={previewBankMovementImport}
+      onCommitBankMovementImport={commitBankMovementImport}
       onUpdateBankMovement={updateBankMovement}
       onDeleteBankMovement={deleteBankMovement}
       onAddJournalEntry={addJournalEntry}

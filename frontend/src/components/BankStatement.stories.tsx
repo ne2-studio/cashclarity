@@ -10,6 +10,11 @@ const meta = {
     journalEntries: fixtureEntries,
     bankMovements: fixtureMovements,
     onAddBankMovement: async (movement) => ({ id: 'new-movement', isIdentified: false, ...movement }),
+    onPreviewBankMovementImport: async () => ({
+      rows: [],
+      summary: { totalRows: 0, valid: 0, duplicates: 0, invalid: 0, warnings: 0 },
+    }),
+    onCommitBankMovementImport: async () => ({ created: [], skippedDuplicates: 0, failed: [] }),
     onUpdateBankMovement: async () => undefined,
     onDeleteBankMovement: async () => undefined,
     onAddJournalEntry: async (entry) => ({ id: 'new-entry', ...entry }),

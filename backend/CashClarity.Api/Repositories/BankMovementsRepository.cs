@@ -9,6 +9,7 @@ public interface IBankMovementsRepository
 {
     Task<List<BankMovementResponse>> GetBankMovements(string userId);
     Task<BankMovementResponse> AddBankMovement(BankMovementCreateRequest req, string userId);
+    Task<List<BankMovementResponse>> AddBankMovements(List<BankMovementCreateRequest> requests, string userId);
     Task UpdateBankMovement(string id, BankMovementPatchRequest patch, string userId);
     Task DeleteBankMovement(string id, string userId);
 }
@@ -40,6 +41,24 @@ public class BankMovementsRepository(FinanceDbContext db) : IBankMovementsReposi
         db.BankMovements.Add(movement);
         await db.SaveChangesAsync();
         return MapBankMovement(movement);
+    }
+
+    public async Task<List<BankMovementResponse>> AddBankMovements(List<BankMovementCreateRequest> requests, string userId)
+    {
+        var movements = requests.Select(req => new BankMovement
+        {
+            Date = ParseDate(req.Date),
+            Description = req.Description,
+            Amount = req.Amount,
+            EntityId = req.EntityId,
+            JournalEntryId = req.JournalEntryId is null ? null : Guid.Parse(req.JournalEntryId),
+            IsIdentified = false,
+            UserId = userId,
+        }).ToList();
+
+        db.BankMovements.AddRange(movements);
+        await db.SaveChangesAsync();
+        return movements.Select(MapBankMovement).ToList();
     }
 
     public async Task UpdateBankMovement(string id, BankMovementPatchRequest patch, string userId)

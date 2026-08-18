@@ -27,4 +27,44 @@ describe('api client', () => {
 
     await expect(api.accounts.getAll()).rejects.toThrow('Unknown error');
   });
+
+  it('previews bank movement imports with multipart form data', async () => {
+    setAccessToken('token-1');
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      rows: [],
+      summary: { totalRows: 0, valid: 0, duplicates: 0, invalid: 0, warnings: 0 },
+    })));
+
+    await api.bankMovements.previewImport(new File(['fecha;Concepto;cantidad'], 'movimientos.csv', { type: 'text/csv' }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:54321/functions/v1/server/bank-movements/imports/preview',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { Authorization: 'Bearer token-1' },
+        body: expect.any(FormData),
+      }),
+    );
+  });
+
+  it('commits bank movement imports and maps created movements', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      created: [{ id: 'm1', date: '2026-01-02', description: 'Nomina', amount: 1000, isIdentified: false }],
+      skippedDuplicates: 0,
+      failed: [],
+    })));
+
+    const result = await api.bankMovements.commitImport([
+      { rowNumber: 2, date: '2026-01-02', description: 'Nomina', amount: 1000, status: 'valid', errors: [] },
+    ]);
+
+    expect(result.created[0].description).toBe('Nomina');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:54321/functions/v1/server/bank-movements/imports',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+  });
 });

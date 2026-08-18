@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { ImportCSV } from './ImportCSV';
+import type { BankMovementImportCommitResult, BankMovementImportPreview, BankMovementImportRow, DuplicatePolicy } from '../api';
 import { IdentifyModal } from './IdentifyModal';
 import { ManualMovementForm, type ManualMovementDraft } from './ManualMovementForm';
 import { MovementsTable } from './MovementsTable';
@@ -23,6 +24,8 @@ interface BankStatementProps {
   bankMovements: BankMovement[];
   journalEntries: JournalEntry[];
   onAddBankMovement: (movement: Omit<BankMovement, 'id' | 'isIdentified'>) => Promise<BankMovement>;
+  onPreviewBankMovementImport: (file: File) => Promise<BankMovementImportPreview>;
+  onCommitBankMovementImport: (rows: BankMovementImportRow[], duplicatePolicy?: DuplicatePolicy) => Promise<BankMovementImportCommitResult>;
   onUpdateBankMovement: (id: string, updates: Partial<BankMovement>) => Promise<void>;
   onDeleteBankMovement: (id: string) => Promise<void>;
   onAddJournalEntry: (entry: Omit<JournalEntry, 'id'>) => Promise<JournalEntry>;
@@ -34,6 +37,8 @@ export function BankStatement({
   bankMovements,
   journalEntries,
   onAddBankMovement,
+  onPreviewBankMovementImport,
+  onCommitBankMovementImport,
   onUpdateBankMovement,
   onDeleteBankMovement,
   onAddJournalEntry,
@@ -211,7 +216,11 @@ export function BankStatement({
 
       {/* Import Modal */}
       {isImporting && (
-        <ImportCSV onClose={() => setIsImporting(false)} onAddBankMovement={onAddBankMovement} />
+        <ImportCSV
+          onClose={() => setIsImporting(false)}
+          onPreview={onPreviewBankMovementImport}
+          onCommit={onCommitBankMovementImport}
+        />
       )}
 
       {/* Identify Modal */}
