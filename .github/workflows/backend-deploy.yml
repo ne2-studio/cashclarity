@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - '.github/workflows/backend-deploy.yml'
+      - '.github/actions/**'
       - 'backend/**'
       - 'scripts/**'
       - 'docker-compose.lite.yml'
@@ -14,11 +15,15 @@ permissions:
   contents: read
   packages: write
 
+concurrency:
+  group: backend-cicd-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   IMAGE_NAME: ghcr.io/ne2-studio/cashclarity-backend
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -32,14 +37,27 @@ jobs:
       - name: Build/test backend
         run: VERIFY_COVERAGE=1 ./scripts/verify backend
 
+      - name: Build/test coverage report
+        uses: ./.github/actions/publish-dotnet-coverage
+        with:
+          reports: backend/coverage/**/coverage.cobertura.xml
+          target-directory: backend/coverage/report
+          artifact-name: backend-coverage-report
+
       - name: Backend persistence tests
         run: ./scripts/verify backend-persistence
 
-      - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Package backend image
+        uses: ./.github/actions/docker-build-image
+        with:
+          image: ${{ env.IMAGE_NAME }}:latest
+          context: backend
+          cache-scope: backend-api
 
-      - name: Build image
-        run: docker build -t $IMAGE_NAME:latest backend
+      - name: Scan backend image
+        uses: ./.github/actions/scan-image
+        with:
+          image: ${{ env.IMAGE_NAME }}:latest
 
       - name: Verify packaged backend
         env:
@@ -47,10 +65,29 @@ jobs:
           KEEP_VERIFY_IMAGES: "1"
         run: ./scripts/verify --skip-image-build backend-acceptance
 
-      - name: Push image
-        run: docker push $IMAGE_NAME:latest
+      - name: Release backend image
+        uses: ./.github/actions/release-ghcr-image
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          context: backend
+          cache-scope: backend-api
+          sha: ${{ github.sha }}
+          username: ${{ github.actor }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Trigger Coolify deploy
-        run: |
-          curl -X GET "${{ secrets.COOLIFY_WEBHOOK_BACKEND }}" \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: backend-production
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy backend
+        uses: ./.github/actions/deploy-coolify
+        with:
+          service: backend
+          webhook: ${{ secrets.COOLIFY_WEBHOOK_BACKEND }}
+          token: ${{ secrets.COOLIFY_API_TOKEN }}

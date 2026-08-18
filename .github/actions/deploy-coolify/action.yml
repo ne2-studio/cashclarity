@@ -1,0 +1,36 @@
+name: Deploy with Coolify
+description: Trigger a Coolify deployment webhook and wait for it to finish.
+
+inputs:
+  service:
+    description: Service name (backend, frontend).
+    required: true
+  webhook:
+    description: Coolify deployment webhook URL for this service.
+    required: true
+  token:
+    description: Coolify API token.
+    required: true
+  deploy-timeout-seconds:
+    description: Max seconds to wait for the Coolify deployment to reach a final status.
+    required: false
+    default: '600'
+  poll-interval-seconds:
+    description: Seconds to wait between deployment status polls.
+    required: false
+    default: '5'
+
+runs:
+  using: composite
+  steps:
+    - name: Deploy
+      shell: bash
+      env:
+        COOLIFY_API_TOKEN: ${{ inputs.token }}
+        DEPLOY_TIMEOUT_SECONDS: ${{ inputs.deploy-timeout-seconds }}
+        POLL_INTERVAL_SECONDS: ${{ inputs.poll-interval-seconds }}
+      run: |
+        set -euo pipefail
+        service_upper=$(echo "${{ inputs.service }}" | tr '[:lower:]' '[:upper:]')
+        export "COOLIFY_WEBHOOK_${service_upper}=${{ inputs.webhook }}"
+        ./scripts/deploy "${{ inputs.service }}"

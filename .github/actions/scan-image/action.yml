@@ -1,0 +1,23 @@
+name: Scan Docker image
+description: Fail the build if a locally-built image has fixable HIGH/CRITICAL vulnerabilities.
+
+inputs:
+  image:
+    description: Image tag to scan.
+    required: true
+  trivyignores:
+    description: Path to a .trivyignore file. Leave empty for none.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Scan image with Trivy
+      uses: aquasecurity/trivy-action@v0.36.0
+      with:
+        image-ref: ${{ inputs.image }}
+        severity: HIGH,CRITICAL
+        ignore-unfixed: true
+        exit-code: "1"
+        trivyignores: ${{ inputs.trivyignores }}
