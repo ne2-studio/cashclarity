@@ -1,13 +1,16 @@
 import { useState, useMemo } from 'react';
-import { useFinanceStore } from '../store/useFinanceStore';
 import { 
   Search, 
   History
 } from 'lucide-react';
 import { JournalEntry, JournalLine, Account } from '../types';
 
-export function Journal() {
-  const { journalEntries, accounts } = useFinanceStore();
+interface JournalProps {
+  journalEntries: JournalEntry[];
+  accounts: Account[];
+}
+
+export function Journal({ journalEntries, accounts }: JournalProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
   const formatCurrency = (val: number) => 

@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { useFinanceStore } from '../store/useFinanceStore';
 import { 
   Users, 
   Plus, 
@@ -10,8 +9,13 @@ import {
 } from 'lucide-react';
 import { Account, JournalEntry, JournalLine } from '../types';
 
-export function Entities() {
-  const { accounts, journalEntries, addAccount } = useFinanceStore();
+interface EntitiesProps {
+  accounts: Account[];
+  journalEntries: JournalEntry[];
+  onAddAccount: (account: Omit<Account, 'id'>) => Promise<Account>;
+}
+
+export function Entities({ accounts, journalEntries, onAddAccount }: EntitiesProps) {
   const entities = useMemo(() => accounts.filter((a: Account) => a.type === 'entity'), [accounts]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEntity, setSelectedEntity] = useState<Account | null>(null);
@@ -24,7 +28,7 @@ export function Entities() {
       alert('El código debe ser numérico de 4 dígitos');
       return;
     }
-    addAccount({ ...newEntity, type: 'entity', active: true });
+    onAddAccount({ ...newEntity, type: 'entity', active: true });
     setIsAdding(false);
     setNewEntity({ name: '', code: '' });
   };

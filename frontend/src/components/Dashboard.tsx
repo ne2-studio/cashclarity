@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { useFinanceStore } from '../store/useFinanceStore';
 import { 
   PiggyBank, 
   Wallet,
@@ -9,6 +8,7 @@ import {
 import { Account } from '../types';
 
 interface DashboardProps {
+  accounts: Account[];
   metrics: {
     realBankBalance: number;
     totalCommitted: number;
@@ -17,8 +17,7 @@ interface DashboardProps {
   };
 }
 
-export function Dashboard({ metrics }: DashboardProps) {
-  const { accounts } = useFinanceStore();
+export function Dashboard({ accounts, metrics }: DashboardProps) {
   const { realBankBalance, totalCommitted, availableCash, bucketBalances } = metrics;
   
   const displayAccounts = useMemo(() => {

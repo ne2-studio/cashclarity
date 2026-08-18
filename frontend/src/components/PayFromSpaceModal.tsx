@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { useFinanceStore } from '../store/useFinanceStore';
 import { Account, BankMovement, JournalLine, JournalEntry } from '../types';
 
 interface PayFromSpaceModalProps {
   movement: BankMovement;
+  accounts: Account[];
   onClose: () => void;
   getOrCreateEntry: (movement: BankMovement) => Promise<JournalEntry | undefined>;
+  onUpdateJournalEntry: (id: string, updates: Partial<JournalEntry>) => Promise<void>;
 }
 
-export function PayFromSpaceModal({ movement, onClose, getOrCreateEntry }: PayFromSpaceModalProps) {
-  const { accounts, updateJournalEntry } = useFinanceStore();
+export function PayFromSpaceModal({
+  movement,
+  accounts,
+  onClose,
+  getOrCreateEntry,
+  onUpdateJournalEntry,
+}: PayFromSpaceModalProps) {
   const [selectedSpaceId, setSelectedSpaceId] = useState('');
 
   const spaces = accounts.filter((a: Account) => a.type === 'space');
@@ -37,7 +43,7 @@ export function PayFromSpaceModal({ movement, onClose, getOrCreateEntry }: PayFr
       return new JournalLine({ ...l });
     });
 
-    await updateJournalEntry(entry.id, { lines: newLines });
+    await onUpdateJournalEntry(entry.id, { lines: newLines });
     onClose();
   };
 

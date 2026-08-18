@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { useFinanceStore } from '../store/useFinanceStore';
 import { 
   Plus, 
   PiggyBank, 
@@ -12,11 +11,14 @@ import {
 import { Account, JournalEntry, JournalLine } from '../types';
 
 interface SpacesProps {
+  accounts: Account[];
+  journalEntries: JournalEntry[];
   bucketBalances: Record<string, number>;
+  onAddAccount: (account: Omit<Account, 'id'>) => Promise<Account>;
+  onDeleteAccount: (id: string) => Promise<void>;
 }
 
-export function Spaces({ bucketBalances }: SpacesProps) {
-  const { accounts, journalEntries, addAccount, updateAccount, deleteAccount } = useFinanceStore();
+export function Spaces({ accounts, journalEntries, bucketBalances, onAddAccount, onDeleteAccount }: SpacesProps) {
   const buckets = useMemo(() => accounts.filter((a: Account) => a.type === 'space' || a.type === 'main'), [accounts]);
   
   const [selectedBucket, setSelectedBucket] = useState<Account | null>(null);
@@ -64,7 +66,7 @@ export function Spaces({ bucketBalances }: SpacesProps) {
       alert('El código debe ser numérico de 4 dígitos');
       return;
     }
-    addAccount({ ...newBucket, type: 'space', active: true });
+    onAddAccount({ ...newBucket, type: 'space', active: true });
     setIsAdding(false);
     setNewBucket({ name: '', code: '' });
   };
@@ -202,7 +204,7 @@ export function Spaces({ bucketBalances }: SpacesProps) {
                       <button className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-elevated rounded-sm transition-all">
                         <Edit2 className="w-4 h-4" />
                       </button>
-                      <button onClick={() => deleteAccount(selectedBucket.id)} className="p-2 text-text-secondary hover:text-primary-orange hover:bg-primary-orange/10 rounded-sm transition-all">
+                      <button onClick={() => onDeleteAccount(selectedBucket.id)} className="p-2 text-text-secondary hover:text-primary-orange hover:bg-primary-orange/10 rounded-sm transition-all">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </>

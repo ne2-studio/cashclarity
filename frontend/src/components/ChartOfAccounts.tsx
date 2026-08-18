@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { useFinanceStore } from '../store/useFinanceStore';
 import { 
   Zap, 
   Plus, 
@@ -10,8 +9,14 @@ import {
 } from 'lucide-react';
 import { Account, AccountType, JournalEntry, JournalLine } from '../types';
 
-export function ChartOfAccounts() {
-  const { accounts, addAccount, deleteAccount, journalEntries } = useFinanceStore();
+interface ChartOfAccountsProps {
+  accounts: Account[];
+  journalEntries: JournalEntry[];
+  onAddAccount: (account: Omit<Account, 'id'>) => Promise<Account>;
+  onDeleteAccount: (id: string) => Promise<void>;
+}
+
+export function ChartOfAccounts({ accounts, journalEntries, onAddAccount, onDeleteAccount }: ChartOfAccountsProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newAccount, setNewAccount] = useState({ code: '', name: '', type: 'space' as AccountType });
   const [searchTerm, setSearchTerm] = useState('');
@@ -44,7 +49,7 @@ export function ChartOfAccounts() {
       alert('El código debe ser numérico de 4 dígitos (ej: 5721)');
       return;
     }
-    addAccount({ ...newAccount, active: true });
+    onAddAccount({ ...newAccount, active: true });
     setIsAdding(false);
     setNewAccount({ code: '', name: '', type: 'space' });
   };
@@ -169,7 +174,7 @@ export function ChartOfAccounts() {
                     {!a.isSystem && (
                       <div className="flex items-center justify-end gap-2">
                         <button className="p-1.5 text-text-secondary hover:text-text-primary transition-all"><Edit2 className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => deleteAccount(a.id)} className="p-1.5 text-text-secondary hover:text-primary-orange transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => onDeleteAccount(a.id)} className="p-1.5 text-text-secondary hover:text-primary-orange transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     )}
                   </td>

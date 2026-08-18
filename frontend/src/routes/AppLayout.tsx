@@ -1,22 +1,22 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  PiggyBank, 
-  Users, 
-  ShieldCheck, 
+import {
+  LayoutDashboard,
+  PiggyBank,
+  Users,
+  ShieldCheck,
   BookOpen,
   ListTree,
   Landmark,
-  LogOut
+  LogOut,
 } from 'lucide-react';
 
-interface LayoutProps {
+interface AppLayoutProps {
   children: React.ReactNode;
   onLogout: () => void;
 }
 
-export function Layout({ children, onLogout }: LayoutProps) {
+export function AppLayout({ children, onLogout }: AppLayoutProps) {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/' },
     { id: 'bank', label: 'Extracto Bancario', icon: Landmark, path: '/bank' },
@@ -28,7 +28,6 @@ export function Layout({ children, onLogout }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-background text-text-primary font-sans flex flex-col">
-      {/* Header */}
       <header className="bg-surface border-b border-border p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <ShieldCheck className="w-6 h-6 text-primary-orange" />
@@ -40,7 +39,6 @@ export function Layout({ children, onLogout }: LayoutProps) {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
         <nav className="w-64 bg-surface border-r border-border flex flex-col">
           <div className="flex-1 py-6">
             {navItems.map((item) => (
@@ -62,9 +60,9 @@ export function Layout({ children, onLogout }: LayoutProps) {
               </NavLink>
             ))}
           </div>
-          
+
           <div className="p-4 border-t border-border">
-            <button 
+            <button
               onClick={onLogout}
               className="w-full flex items-center gap-3 px-6 py-2.5 text-sm font-medium text-text-secondary hover:text-primary-orange hover:bg-surface-elevated/50 transition-all duration-200 rounded-sm"
             >
@@ -78,7 +76,6 @@ export function Layout({ children, onLogout }: LayoutProps) {
           </div>
         </nav>
 
-        {/* Main Content */}
         <main className="flex-1 overflow-y-auto p-8 bg-background">
           <div className="max-w-7xl mx-auto">
             {children}

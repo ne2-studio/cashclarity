@@ -1,16 +1,24 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { useFinanceStore } from '../store/useFinanceStore';
 import { Account, BankMovement, JournalLine, JournalEntry } from '../types';
 
 interface IdentifyModalProps {
   movement: BankMovement;
+  accounts: Account[];
   onClose: () => void;
   getOrCreateEntry: (movement: BankMovement) => Promise<JournalEntry | undefined>;
+  onUpdateJournalEntry: (id: string, updates: Partial<JournalEntry>) => Promise<void>;
+  onUpdateBankMovement: (id: string, updates: Partial<BankMovement>) => Promise<void>;
 }
 
-export function IdentifyModal({ movement, onClose, getOrCreateEntry }: IdentifyModalProps) {
-  const { accounts, updateJournalEntry, updateBankMovement } = useFinanceStore();
+export function IdentifyModal({
+  movement,
+  accounts,
+  onClose,
+  getOrCreateEntry,
+  onUpdateJournalEntry,
+  onUpdateBankMovement,
+}: IdentifyModalProps) {
   const [selectedEntityId, setSelectedEntityId] = useState('');
 
   const entities = accounts.filter((a: Account) => a.type === 'entity');
@@ -32,8 +40,8 @@ export function IdentifyModal({ movement, onClose, getOrCreateEntry }: IdentifyM
       return new JournalLine({ ...l });
     });
 
-    await updateJournalEntry(entry.id, { lines: newLines });
-    await updateBankMovement(movement.id, { 
+    await onUpdateJournalEntry(entry.id, { lines: newLines });
+    await onUpdateBankMovement(movement.id, { 
       isIdentified: true, 
       entityId: selectedEntityId
     });

@@ -1,14 +1,13 @@
-import { useMemo, useEffect } from 'react';
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useFinanceStore } from './store/useFinanceStore';
-import { Layout } from './components/Layout';
-import { Dashboard } from './components/Dashboard';
-import { BankStatement } from './components/BankStatement';
-import { Spaces } from './components/Spaces';
-import { Entities } from './components/Entities';
-import { Journal } from './components/Journal';
-import { ChartOfAccounts } from './components/ChartOfAccounts';
-import { JournalEntry } from './types';
+import { AppLayout } from './routes/AppLayout';
+import { DashboardRoute } from './routes/DashboardRoute';
+import { BankStatementRoute } from './routes/BankStatementRoute';
+import { SpacesRoute } from './routes/SpacesRoute';
+import { EntitiesRoute } from './routes/EntitiesRoute';
+import { JournalRoute } from './routes/JournalRoute';
+import { ChartOfAccountsRoute } from './routes/ChartOfAccountsRoute';
 import { useAuth } from "react-oidc-context";
 import { setAccessToken } from './api';
 import { getEnv } from './runtimeConfig';
@@ -16,7 +15,7 @@ import { getEnv } from './runtimeConfig';
 export default function App() {
   const authDisabled = getEnv('VITE_AUTH_DISABLED') === 'true';
   const auth = useAuth();
-  const { accounts, journalEntries, fetchData, isLoading, error } = useFinanceStore();
+  const { fetchData, isLoading, error } = useFinanceStore();
 
   useEffect(() => {
     setAccessToken(authDisabled ? 'acceptance-token' : auth.user?.access_token);
@@ -40,36 +39,6 @@ export default function App() {
     if (authDisabled) return;
     await auth.signoutRedirect();
   };
-
-  const treasuryMetrics = useMemo(() => {
-    const accountBalances: Record<string, number> = {};
-    accounts.forEach(a => accountBalances[a.id] = 0);
-
-    journalEntries.forEach((entry: JournalEntry) => {
-      entry.lines.forEach(line => {
-        if (accountBalances[line.accountId] !== undefined) {
-          accountBalances[line.accountId] += (line.debit - line.credit);
-        }
-      });
-    });
-
-    const mainAccount = accounts.find(a => a.type === 'main');
-    const spaceAccounts = accounts.filter(a => a.type === 'space');
-
-    const totalCommitted = spaceAccounts
-      .reduce((sum, a) => sum + accountBalances[a.id], 0);
-
-    const mainBalance = mainAccount ? accountBalances[mainAccount.id] : 0;
-    const realBankBalance = mainBalance + totalCommitted;
-    const availableCash = mainBalance;
-
-    return {
-      realBankBalance,
-      totalCommitted,
-      availableCash,
-      bucketBalances: accountBalances
-    };
-  }, [accounts, journalEntries]);
 
   if (!authDisabled && (auth.isLoading || !auth.isAuthenticated)) {
     return (
@@ -113,18 +82,18 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Layout onLogout={handleLogout}>
+      <AppLayout onLogout={handleLogout}>
         <Routes>
-          <Route path="/" element={<Dashboard metrics={treasuryMetrics} />} />
-          <Route path="/bank" element={<BankStatement />} />
-          <Route path="/spaces" element={<Spaces bucketBalances={treasuryMetrics.bucketBalances} />} />
-          <Route path="/entities" element={<Entities />} />
-          <Route path="/journal" element={<Journal />} />
-          <Route path="/coa" element={<ChartOfAccounts />} />
+          <Route path="/" element={<DashboardRoute />} />
+          <Route path="/bank" element={<BankStatementRoute />} />
+          <Route path="/spaces" element={<SpacesRoute />} />
+          <Route path="/entities" element={<EntitiesRoute />} />
+          <Route path="/journal" element={<JournalRoute />} />
+          <Route path="/coa" element={<ChartOfAccountsRoute />} />
           <Route path="/callback" element={null} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </Layout>
+      </AppLayout>
     </BrowserRouter>
   );
 }

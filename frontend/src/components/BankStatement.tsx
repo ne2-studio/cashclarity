@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { useFinanceStore } from '../store/useFinanceStore';
 import { ImportCSV } from './ImportCSV';
 import { IdentifyModal } from './IdentifyModal';
 import { ReserveModal } from './ReserveModal';
@@ -22,17 +21,27 @@ import {
 } from 'lucide-react';
 import { Account, BankMovement, JournalEntry, JournalLine } from '../types';
 
-export function BankStatement() {
-  const { 
-    accounts, 
-    bankMovements, 
-    addBankMovement, 
-    updateBankMovement, 
-    deleteBankMovement,
-    addJournalEntry,
-    updateJournalEntry,
-    journalEntries
-  } = useFinanceStore();
+interface BankStatementProps {
+  accounts: Account[];
+  bankMovements: BankMovement[];
+  journalEntries: JournalEntry[];
+  onAddBankMovement: (movement: Omit<BankMovement, 'id' | 'isIdentified'>) => Promise<BankMovement>;
+  onUpdateBankMovement: (id: string, updates: Partial<BankMovement>) => Promise<void>;
+  onDeleteBankMovement: (id: string) => Promise<void>;
+  onAddJournalEntry: (entry: Omit<JournalEntry, 'id'>) => Promise<JournalEntry>;
+  onUpdateJournalEntry: (id: string, updates: Partial<JournalEntry>) => Promise<void>;
+}
+
+export function BankStatement({
+  accounts,
+  bankMovements,
+  journalEntries,
+  onAddBankMovement,
+  onUpdateBankMovement,
+  onDeleteBankMovement,
+  onAddJournalEntry,
+  onUpdateJournalEntry,
+}: BankStatementProps) {
 
   const [isAdding, setIsAdding] = useState(false);
   const [newMovement, setNewMovement] = useState({
@@ -75,7 +84,7 @@ export function BankStatement() {
 
   const handleAddMovement = () => {
     if (!newMovement.description || !newMovement.amount) return;
-    addBankMovement({
+    onAddBankMovement({
       date: newMovement.date,
       description: newMovement.description,
       amount: parseFloat(newMovement.amount)
@@ -102,7 +111,7 @@ export function BankStatement() {
     const isIncome = movement.amount > 0;
     const absAmount = Math.abs(movement.amount);
 
-    const entry = await addJournalEntry({
+    const entry = await onAddJournalEntry({
       description: movement.description,
       date: movement.date,
       lines: [
@@ -121,7 +130,7 @@ export function BankStatement() {
       ]
     });
 
-    await updateBankMovement(movement.id, { journalEntryId: entry.id });
+    await onUpdateBankMovement(movement.id, { journalEntryId: entry.id });
     return entry;
   };
 
@@ -158,7 +167,7 @@ export function BankStatement() {
       return;
     }
 
-    await updateJournalEntry(editingMovement.journalEntryId!, {
+    await onUpdateJournalEntry(editingMovement.journalEntryId!, {
       date: updatedEntry.date,
       description: updatedEntry.description,
       lines: updatedEntry.lines.map(l => new JournalLine(l))
@@ -181,10 +190,10 @@ export function BankStatement() {
     const movement = bankMovements.find(m => m.id === id);
     if (!movement) return;
 
-    await updateBankMovement(id, { description: tempDescription });
+    await onUpdateBankMovement(id, { description: tempDescription });
 
     if (movement.journalEntryId) {
-      await updateJournalEntry(movement.journalEntryId, { description: tempDescription });
+      await onUpdateJournalEntry(movement.journalEntryId, { description: tempDescription });
     }
 
     setEditingDescriptionId(null);
@@ -408,7 +417,7 @@ export function BankStatement() {
                       </button>
                       
                       <button 
-                        onClick={() => deleteBankMovement(m.id)}
+                        onClick={() => onDeleteBankMovement(m.id)}
                         className="p-1.5 text-text-secondary hover:text-primary-orange opacity-0 group-hover:opacity-100 transition-all"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -434,15 +443,18 @@ export function BankStatement() {
 
       {/* Import Modal */}
       {isImporting && (
-        <ImportCSV onClose={() => setIsImporting(false)} />
+        <ImportCSV onClose={() => setIsImporting(false)} onAddBankMovement={onAddBankMovement} />
       )}
 
       {/* Identify Modal */}
       {identifyingMovement && (
         <IdentifyModal 
           movement={identifyingMovement} 
+          accounts={accounts}
           onClose={() => setIdentifyingMovement(null)} 
           getOrCreateEntry={getOrCreateEntry} 
+          onUpdateJournalEntry={onUpdateJournalEntry}
+          onUpdateBankMovement={onUpdateBankMovement}
         />
       )}
 
@@ -450,8 +462,10 @@ export function BankStatement() {
       {reservingMovement && (
         <ReserveModal 
           movement={reservingMovement} 
+          accounts={accounts}
           onClose={() => setReservingMovement(null)} 
           getOrCreateEntry={getOrCreateEntry} 
+          onUpdateJournalEntry={onUpdateJournalEntry}
           formatCurrency={formatCurrency}
         />
       )}
@@ -460,8 +474,10 @@ export function BankStatement() {
       {payingFromSpaceMovement && (
         <PayFromSpaceModal 
           movement={payingFromSpaceMovement} 
+          accounts={accounts}
           onClose={() => setPayingFromSpaceMovement(null)} 
           getOrCreateEntry={getOrCreateEntry} 
+          onUpdateJournalEntry={onUpdateJournalEntry}
         />
       )}
 
