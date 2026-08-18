@@ -1,4 +1,4 @@
-using CashClarity.Api.Domain;
+using CashClarity.Api.Controllers;
 using CashClarity.Api.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Xunit;

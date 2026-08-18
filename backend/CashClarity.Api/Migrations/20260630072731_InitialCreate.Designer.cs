@@ -25,7 +25,7 @@ namespace CashClarity.Api.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("CashClarity.Api.Models.Account", b =>
+            modelBuilder.Entity("CashClarity.Api.Domain.Account", b =>
                 {
                     b.Property<string>("Id")
                         .ValueGeneratedOnAdd()
@@ -87,7 +87,7 @@ namespace CashClarity.Api.Migrations
                     b.ToTable("accounts", (string)null);
                 });
 
-            modelBuilder.Entity("CashClarity.Api.Models.BankMovement", b =>
+            modelBuilder.Entity("CashClarity.Api.Domain.BankMovement", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -153,7 +153,7 @@ namespace CashClarity.Api.Migrations
                     b.ToTable("bank_movements", (string)null);
                 });
 
-            modelBuilder.Entity("CashClarity.Api.Models.JournalEntry", b =>
+            modelBuilder.Entity("CashClarity.Api.Domain.JournalEntry", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -193,7 +193,7 @@ namespace CashClarity.Api.Migrations
                     b.ToTable("journal_entries", (string)null);
                 });
 
-            modelBuilder.Entity("CashClarity.Api.Models.JournalLine", b =>
+            modelBuilder.Entity("CashClarity.Api.Domain.JournalLine", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -251,35 +251,35 @@ namespace CashClarity.Api.Migrations
                     b.ToTable("journal_lines", (string)null);
                 });
 
-            modelBuilder.Entity("CashClarity.Api.Models.BankMovement", b =>
+            modelBuilder.Entity("CashClarity.Api.Domain.BankMovement", b =>
                 {
-                    b.HasOne("CashClarity.Api.Models.Account", null)
+                    b.HasOne("CashClarity.Api.Domain.Account", null)
                         .WithMany()
                         .HasForeignKey("EntityId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("CashClarity.Api.Models.JournalEntry", null)
+                    b.HasOne("CashClarity.Api.Domain.JournalEntry", null)
                         .WithMany()
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 
-            modelBuilder.Entity("CashClarity.Api.Models.JournalLine", b =>
+            modelBuilder.Entity("CashClarity.Api.Domain.JournalLine", b =>
                 {
-                    b.HasOne("CashClarity.Api.Models.Account", null)
+                    b.HasOne("CashClarity.Api.Domain.Account", null)
                         .WithMany()
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("CashClarity.Api.Models.JournalEntry", null)
+                    b.HasOne("CashClarity.Api.Domain.JournalEntry", null)
                         .WithMany("Lines")
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("CashClarity.Api.Models.JournalEntry", b =>
+            modelBuilder.Entity("CashClarity.Api.Domain.JournalEntry", b =>
                 {
                     b.Navigation("Lines");
                 });

@@ -1,4 +1,4 @@
-using CashClarity.Api.Models;
+using CashClarity.Api.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace CashClarity.Api.Data;

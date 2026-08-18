@@ -1,5 +1,3 @@
-using System.Security.Claims;
-using CashClarity.Api.Domain;
 using CashClarity.Api.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,12 +7,8 @@ namespace CashClarity.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("server/accounts")]
-public class AccountsController(IAccountsRepository repo) : ControllerBase
+public class AccountsController(IAccountsRepository repo) : BaseController
 {
-    private string UserId =>
-        User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-        ?? throw new UnauthorizedAccessException("Missing user id claim");
-
     [HttpGet]
     public async Task<IActionResult> GetAccounts()
     {
@@ -43,3 +37,7 @@ public class AccountsController(IAccountsRepository repo) : ControllerBase
         catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
     }
 }
+
+public record AccountResponse(string Id, string Code, string Name, string Type, decimal Balance, bool IsSystem, string UserId);
+public record AccountCreateRequest(string Code, string Name, string Type, decimal Balance = 0, bool? IsSystem = null);
+public record AccountPatchRequest(string? Code = null, string? Name = null, string? Type = null, decimal? Balance = null, bool? IsSystem = null);

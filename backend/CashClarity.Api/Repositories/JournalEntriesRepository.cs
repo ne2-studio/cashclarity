@@ -1,6 +1,6 @@
 using CashClarity.Api.Data;
+using CashClarity.Api.Controllers;
 using CashClarity.Api.Domain;
-using CashClarity.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace CashClarity.Api.Repositories;

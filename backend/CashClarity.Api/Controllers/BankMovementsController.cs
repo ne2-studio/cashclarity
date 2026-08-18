@@ -1,5 +1,3 @@
-using System.Security.Claims;
-using CashClarity.Api.Domain;
 using CashClarity.Api.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,12 +7,8 @@ namespace CashClarity.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("server/bank-movements")]
-public class BankMovementsController(IBankMovementsRepository repo) : ControllerBase
+public class BankMovementsController(IBankMovementsRepository repo) : BaseController
 {
-    private string UserId =>
-        User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-        ?? throw new UnauthorizedAccessException("Missing user id claim");
-
     [HttpGet]
     public async Task<IActionResult> GetBankMovements()
     {
@@ -43,3 +37,7 @@ public class BankMovementsController(IBankMovementsRepository repo) : Controller
         catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
     }
 }
+
+public record BankMovementResponse(string Id, DateTime Date, string Description, decimal Amount, bool IsIdentified, string? EntityId, string? JournalEntryId, string UserId);
+public record BankMovementCreateRequest(string Date, string Description, decimal Amount, string? EntityId = null, string? JournalEntryId = null);
+public record BankMovementPatchRequest(string? Date = null, string? Description = null, decimal? Amount = null, bool? IsIdentified = null, string? EntityId = null, string? JournalEntryId = null);

@@ -1,4 +1,4 @@
-namespace CashClarity.Api.Models;
+namespace CashClarity.Api.Domain;
 
 public class Account
 {

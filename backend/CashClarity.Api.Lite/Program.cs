@@ -1,5 +1,4 @@
 using CashClarity.Api.Controllers;
-using CashClarity.Api.Domain;
 using CashClarity.Api.Lite;
 using CashClarity.Api.Repositories;
 using Microsoft.AspNetCore.Authentication;
