@@ -146,7 +146,7 @@ export function Spaces({ accounts, journalEntries, bucketBalances, onAddAccount,
                 </div>
               </div>
 
-              <Card className="overflow-hidden">
+              <Card className="overflow-x-auto">
                 <div className="p-4 border-b border-border flex items-center justify-between bg-surface-elevated/20">
                   <h4 className="text-[10px] font-mono uppercase tracking-widest text-text-secondary flex items-center gap-2">
                     <History className="w-3.5 h-3.5" /> Extracto Virtual de Movimientos

@@ -57,6 +57,14 @@
   @apply text-primary-orange;
 }
 
+.responsive-content {
+  overflow-wrap: anywhere;
+}
+
+.responsive-content table {
+  min-width: 42rem;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

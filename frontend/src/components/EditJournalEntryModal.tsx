@@ -81,7 +81,7 @@ export function EditJournalEntryModal({
               </FormField>
             </div>
 
-            <Card className="bg-background overflow-hidden">
+            <Card className="bg-background overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-surface-elevated/10 border-b border-border">

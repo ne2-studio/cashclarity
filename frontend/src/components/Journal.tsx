@@ -36,7 +36,7 @@ export function Journal({ journalEntries, accounts }: JournalProps) {
         />
       </Card>
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
             <tr className="bg-surface-elevated/50 border-b border-border">

@@ -50,7 +50,7 @@ export function MovementsTable({
   };
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-x-auto">
       <div className="p-4 border-b border-border flex items-center justify-between bg-surface-elevated/20">
         <h4 className="text-[10px] font-mono uppercase tracking-widest text-text-secondary">Extracto de Movimientos Bancarios</h4>
         <div className="flex items-center gap-4">

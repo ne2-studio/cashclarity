@@ -24,7 +24,7 @@ export function BucketSummarySection({
       <SectionHeader title="Espacios // Reservas y Provisiones" />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div>
-          <Card className="overflow-hidden">
+          <Card className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr>

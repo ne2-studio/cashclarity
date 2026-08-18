@@ -6,12 +6,14 @@ interface SidebarNavItemProps {
   to: string;
   icon: ElementType<{ className?: string }>;
   children: string;
+  onClick?: () => void;
 }
 
-export function SidebarNavItem({ to, icon: Icon, children }: SidebarNavItemProps) {
+export function SidebarNavItem({ to, icon: Icon, children, onClick }: SidebarNavItemProps) {
   return (
     <NavLink
       to={to}
+      onClick={onClick}
       className={({ isActive }) => cx(
         'w-full flex items-center gap-3 px-6 py-2.5 text-sm font-medium transition-all duration-200 border-r-2',
         isActive
