@@ -9,7 +9,8 @@ import {
 import { Account, JournalEntry } from '../types';
 import { getAccountSummary, useEntityLedger } from '../hooks/ledgerViews';
 import { getEntityAccounts, isValidAccountCode } from '../hooks/accountViews';
-import { Button, Card, FormField, IconButton, Input, PageHeader, SearchField, StatCard } from '../design-system';
+import { Button, Card, IconButton, PageHeader, SearchField, StatCard } from '../design-system';
+import { CreateEntityForm, type EntityDraft } from './CreateEntityForm';
 
 interface EntitiesProps {
   accounts: Account[];
@@ -21,7 +22,7 @@ export function Entities({ accounts, journalEntries, onAddAccount }: EntitiesPro
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEntity, setSelectedEntity] = useState<Account | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const [newEntity, setNewEntity] = useState({ name: '', code: '' });
+  const [newEntity, setNewEntity] = useState<EntityDraft>({ name: '', code: '' });
 
   const selectedEntityStats = useEntityLedger(journalEntries, selectedEntity);
 
@@ -66,35 +67,12 @@ export function Entities({ accounts, journalEntries, onAddAccount }: EntitiesPro
       />
 
       {isAdding && (
-        <Card className="p-6 animate-in fade-in slide-in-from-top-2 duration-300">
-          <h3 className="text-[10px] font-mono uppercase tracking-widest text-text-secondary mb-6">Crear Nueva Entidad</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <FormField label="Código (4 dígitos)">
-              <Input
-                type="text" 
-                value={newEntity.code}
-                onChange={e => setNewEntity(prev => ({ ...prev, code: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
-                placeholder="Ej: 4300"
-              />
-            </FormField>
-            <FormField label="Nombre">
-              <Input
-                type="text" 
-                value={newEntity.name}
-                onChange={e => setNewEntity(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Ej: Cliente A"
-              />
-            </FormField>
-          </div>
-          <div className="flex justify-end gap-3">
-            <Button variant="ghost" onClick={() => setIsAdding(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleAddEntity}>
-              Crear Entidad
-            </Button>
-          </div>
-        </Card>
+        <CreateEntityForm
+          entity={newEntity}
+          onCancel={() => setIsAdding(false)}
+          onChange={setNewEntity}
+          onSubmit={handleAddEntity}
+        />
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

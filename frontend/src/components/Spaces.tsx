@@ -11,7 +11,8 @@ import {
 import { Account, JournalEntry } from '../types';
 import { isValidAccountCode, useSpaceAccounts } from '../hooks/accountViews';
 import { useSpaceLedger } from '../hooks/ledgerViews';
-import { Button, Card, FormField, IconButton, Input, PageHeader } from '../design-system';
+import { Button, Card, IconButton, PageHeader } from '../design-system';
+import { CreateSpaceForm, type SpaceDraft } from './CreateSpaceForm';
 
 interface SpacesProps {
   accounts: Account[];
@@ -24,7 +25,7 @@ interface SpacesProps {
 export function Spaces({ accounts, journalEntries, bucketBalances, onAddAccount, onDeleteAccount }: SpacesProps) {
   const [selectedBucket, setSelectedBucket] = useState<Account | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const [newBucket, setNewBucket] = useState({ name: '', code: '' });
+  const [newBucket, setNewBucket] = useState<SpaceDraft>({ name: '', code: '' });
   const sortedBuckets = useSpaceAccounts(accounts);
   const bucketTransactions = useSpaceLedger(journalEntries, selectedBucket);
 
@@ -57,35 +58,12 @@ export function Spaces({ accounts, journalEntries, bucketBalances, onAddAccount,
       />
 
       {isAdding && (
-        <Card className="p-6 animate-in fade-in slide-in-from-top-2 duration-300">
-          <h3 className="text-[10px] font-mono uppercase tracking-widest text-text-secondary mb-6">Crear Nuevo Espacio</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <FormField label="Código (4 dígitos)">
-              <Input
-                type="text" 
-                value={newBucket.code}
-                onChange={e => setNewBucket(prev => ({ ...prev, code: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
-                placeholder="Ej: 5722"
-              />
-            </FormField>
-            <FormField label="Nombre">
-              <Input
-                type="text" 
-                value={newBucket.name}
-                onChange={e => setNewBucket(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Ej: Reserva IVA"
-              />
-            </FormField>
-          </div>
-          <div className="flex justify-end gap-3">
-            <Button variant="ghost" onClick={() => setIsAdding(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleAddBucket}>
-              Crear Espacio
-            </Button>
-          </div>
-        </Card>
+        <CreateSpaceForm
+          space={newBucket}
+          onCancel={() => setIsAdding(false)}
+          onChange={setNewBucket}
+          onSubmit={handleAddBucket}
+        />
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

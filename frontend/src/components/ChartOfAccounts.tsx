@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import { Account, AccountType, JournalEntry } from '../types';
 import { isValidAccountCode, useChartOfAccountsViewModel } from '../hooks/accountViews';
-import { Button, Card, FormField, IconButton, Input, PageHeader, SearchField, Select } from '../design-system';
+import { Button, Card, IconButton, PageHeader, SearchField } from '../design-system';
+import { CreateAccountForm, type AccountDraft } from './CreateAccountForm';
 
 interface ChartOfAccountsProps {
   accounts: Account[];
@@ -18,7 +19,7 @@ interface ChartOfAccountsProps {
 
 export function ChartOfAccounts({ accounts, journalEntries, onAddAccount, onDeleteAccount }: ChartOfAccountsProps) {
   const [isAdding, setIsAdding] = useState(false);
-  const [newAccount, setNewAccount] = useState({ code: '', name: '', type: 'space' as AccountType });
+  const [newAccount, setNewAccount] = useState<AccountDraft>({ code: '', name: '', type: 'space' as AccountType });
   const [searchTerm, setSearchTerm] = useState('');
   const { accountStats, filteredAccounts } = useChartOfAccountsViewModel(accounts, journalEntries, searchTerm);
 
@@ -51,40 +52,12 @@ export function ChartOfAccounts({ accounts, journalEntries, onAddAccount, onDele
       />
 
       {isAdding && (
-        <Card className="p-6 animate-in fade-in slide-in-from-top-2 duration-300">
-          <h3 className="text-[10px] font-mono uppercase tracking-widest text-text-secondary mb-6">Crear Nueva Cuenta</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <FormField label="Código (4 dígitos)">
-              <Input
-                type="text" 
-                value={newAccount.code}
-                onChange={e => setNewAccount(prev => ({ ...prev, code: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
-                placeholder="Ej: 5721"
-              />
-            </FormField>
-            <FormField label="Nombre">
-              <Input
-                type="text" 
-                value={newAccount.name}
-                onChange={e => setNewAccount(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Ej: Banco Sabadell"
-              />
-            </FormField>
-            <FormField label="Tipo">
-              <Select
-                value={newAccount.type}
-                onChange={e => setNewAccount(prev => ({ ...prev, type: e.target.value as AccountType }))}
-              >
-                <option value="space">ESPACIO</option>
-                <option value="entity">ENTIDAD</option>
-              </Select>
-            </FormField>
-          </div>
-          <div className="flex justify-end gap-3">
-            <Button variant="ghost" onClick={() => setIsAdding(false)}>Cancelar</Button>
-            <Button onClick={handleAddAccount}>Crear Cuenta</Button>
-          </div>
-        </Card>
+        <CreateAccountForm
+          account={newAccount}
+          onCancel={() => setIsAdding(false)}
+          onChange={setNewAccount}
+          onSubmit={handleAddAccount}
+        />
       )}
 
       <Card className="flex items-center gap-4 p-4">
