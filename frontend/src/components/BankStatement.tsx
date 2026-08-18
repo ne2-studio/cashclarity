@@ -181,7 +181,7 @@ export function BankStatement({
             onClick={handleImportCSV}
             icon={<Upload className="w-3.5 h-3.5" />}
           >
-            Importar CSV
+            Importar
           </Button>
           <Button
             size="sm"

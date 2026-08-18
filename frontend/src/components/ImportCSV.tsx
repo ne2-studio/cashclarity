@@ -53,7 +53,7 @@ export function ImportCSV({ onClose, onPreview, onCommit }: ImportCSVProps) {
 
   return (
     <Modal
-      title="Importar Movimientos CSV"
+      title="Importar Movimientos"
       onClose={onClose}
       width="2xl"
       footer={(
@@ -67,11 +67,11 @@ export function ImportCSV({ onClose, onPreview, onCommit }: ImportCSVProps) {
     >
           <div className="flex flex-col gap-4">
             <p className="text-xs text-text-secondary">
-              Selecciona un archivo CSV con formato separado por punto y coma (;) y las columnas: <span className="font-mono font-bold">fecha; Concepto; cantidad</span>
+              Selecciona un archivo CSV o Excel con columnas: <span className="font-mono font-bold">Fecha; Concepto/Movimiento; Cantidad/Importe</span>
             </p>
             <input 
               type="file" 
-              accept=".csv"
+              accept=".csv,.xls,.xlsx"
               onChange={handleFileChange}
               className="block w-full text-xs text-text-secondary
                 file:mr-4 file:py-2 file:px-4

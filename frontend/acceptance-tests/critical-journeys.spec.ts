@@ -169,7 +169,7 @@ test('CSV import previews and imports bank movements', async ({ page }, testInfo
   const importedDescription = uniqueLabel('Ingreso CSV');
 
   await openNav(page, 'Extracto Bancario');
-  await page.getByRole('button', { name: 'Importar CSV' }).click();
+  await page.getByRole('button', { name: 'Importar' }).click();
   await page.locator('input[type="file"]').setInputFiles({
     name: 'movimientos.csv',
     mimeType: 'text/csv',
@@ -179,7 +179,7 @@ test('CSV import previews and imports bank movements', async ({ page }, testInfo
   await expect(page.locator('tbody tr', { hasText: importedDescription })).toContainText(cashText(42.5));
 
   await page.getByRole('button', { name: 'Importar 1 Movimientos' }).click();
-  await expect(page.getByRole('heading', { name: 'Importar Movimientos CSV' })).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Importar Movimientos' })).toBeHidden();
   await expect(page.locator('tbody tr', { hasText: importedDescription })).toContainText(cashText(42.5));
 
   assertNoBrowserErrors();

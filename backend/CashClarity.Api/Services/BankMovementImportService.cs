@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using ExcelDataReader;
 using CashClarity.Api.Controllers;
 using CashClarity.Api.Repositories;
 
@@ -13,11 +14,16 @@ public interface IBankMovementImportService
 
 public class BankMovementImportService(IBankMovementsRepository bankMovements) : IBankMovementImportService
 {
-    public async Task<BankMovementImportPreviewResponse> Preview(Stream csv, string userId)
+    static BankMovementImportService()
     {
-        using var reader = new StreamReader(csv, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: false);
-        var text = await reader.ReadToEndAsync();
-        var parsedRows = Parse(text);
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    }
+
+    public async Task<BankMovementImportPreviewResponse> Preview(Stream importFile, string userId)
+    {
+        using var memory = new MemoryStream();
+        await importFile.CopyToAsync(memory);
+        var parsedRows = Parse(memory.ToArray());
         var existing = await bankMovements.GetBankMovements(userId);
         var rows = MarkDuplicates(parsedRows, existing);
 
@@ -53,18 +59,31 @@ public class BankMovementImportService(IBankMovementsRepository bankMovements) :
             failed);
     }
 
-    private static List<BankMovementImportRow> Parse(string text)
+    private static List<BankMovementImportRow> Parse(byte[] file)
     {
-        var records = ReadCsvRecords(text);
-        if (records.Count < 2)
+        return IsExcel(file)
+            ? ParseTabular(ReadExcelRecords(file))
+            : ParseTabular(ReadCsvRecords(Encoding.UTF8.GetString(file)));
+    }
+
+    private static bool IsExcel(byte[] file) =>
+        file.Length >= 4 &&
+        ((file[0] == 0xD0 && file[1] == 0xCF && file[2] == 0x11 && file[3] == 0xE0) ||
+         (file[0] == 0x50 && file[1] == 0x4B && file[2] == 0x03 && file[3] == 0x04));
+
+    private static List<BankMovementImportRow> ParseTabular(List<List<ImportCell>> records)
+    {
+        var headerRowIndex = FindHeaderRow(records);
+        if (headerRowIndex < 0)
         {
-            return [InvalidFileRow("El archivo esta vacio o no tiene suficientes lineas.")];
+            return [InvalidFileRow("Formato de archivo invalido. Debe contener columnas de fecha, concepto/movimiento e importe/cantidad.")];
         }
 
-        var headers = records[0].Select(CleanHeader).ToList();
+        var headers = records[headerRowIndex].Select(CleanHeader).ToList();
         var dateIndex = headers.IndexOf("fecha");
-        var descriptionIndex = headers.IndexOf("concepto");
-        var amountIndex = headers.IndexOf("cantidad");
+        var descriptionIndex = FirstHeaderIndex(headers, "concepto", "movimiento");
+        var detailsIndex = FirstHeaderIndex(headers, "mas datos", "más datos");
+        var amountIndex = FirstHeaderIndex(headers, "cantidad", "importe");
 
         if (dateIndex < 0 || descriptionIndex < 0 || amountIndex < 0)
         {
@@ -80,28 +99,33 @@ public class BankMovementImportService(IBankMovementsRepository bankMovements) :
         }
 
         var rows = new List<BankMovementImportRow>();
-        for (var i = 1; i < records.Count; i++)
+        for (var i = headerRowIndex + 1; i < records.Count; i++)
         {
             var record = records[i];
-            if (record.All(string.IsNullOrWhiteSpace)) continue;
+            if (record.All(cell => string.IsNullOrWhiteSpace(CleanCell(cell)))) continue;
 
-            var dateText = GetCell(record, dateIndex);
-            var description = GetCell(record, descriptionIndex);
-            var amountText = GetCell(record, amountIndex);
+            var dateCell = GetCell(record, dateIndex);
+            var description = CleanCell(GetCell(record, descriptionIndex));
+            var details = detailsIndex < 0 ? string.Empty : CleanCell(GetCell(record, detailsIndex));
+            var amountCell = GetCell(record, amountIndex);
             var errors = new List<string>();
 
-            var date = TryParseDate(dateText, out var parsedDate)
+            var date = TryParseDate(dateCell, out var parsedDate)
                 ? parsedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
                 : null;
             if (date is null) errors.Add("Fecha invalida");
             if (string.IsNullOrWhiteSpace(description)) errors.Add("Concepto obligatorio");
-            var amount = TryParseAmount(amountText, out var parsedAmount) ? parsedAmount : (decimal?)null;
+            var amount = TryParseAmount(amountCell, out var parsedAmount) ? parsedAmount : (decimal?)null;
             if (amount is null) errors.Add("Cantidad invalida");
+
+            var fullDescription = string.IsNullOrWhiteSpace(details)
+                ? description
+                : $"{description} {details}";
 
             rows.Add(new BankMovementImportRow(
                 i + 1,
                 date,
-                string.IsNullOrWhiteSpace(description) ? null : description,
+                string.IsNullOrWhiteSpace(fullDescription) ? null : fullDescription,
                 amount,
                 errors.Count == 0 ? BankMovementImportRowStatus.Valid : BankMovementImportRowStatus.Invalid,
                 null,
@@ -175,15 +199,64 @@ public class BankMovementImportService(IBankMovementsRepository bankMovements) :
     private static string NormalizeDescription(string description) =>
         string.Join(' ', description.Trim().ToUpperInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
 
-    private static string CleanHeader(string value) => CleanCell(value).ToLowerInvariant();
-
-    private static string GetCell(List<string> record, int index) =>
-        index < record.Count ? CleanCell(record[index]) : string.Empty;
-
-    private static string CleanCell(string value) => value.Trim().Trim('"', '\'').Trim();
-
-    private static bool TryParseDate(string value, out DateTime date)
+    private static int FindHeaderRow(List<List<ImportCell>> records)
     {
+        for (var i = 0; i < records.Count; i++)
+        {
+            var headers = records[i].Select(CleanHeader).ToList();
+            if (headers.Contains("fecha") &&
+                FirstHeaderIndex(headers, "concepto", "movimiento") >= 0 &&
+                FirstHeaderIndex(headers, "cantidad", "importe") >= 0)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static int FirstHeaderIndex(List<string> headers, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            var index = headers.IndexOf(name);
+            if (index >= 0) return index;
+        }
+
+        return -1;
+    }
+
+    private static string CleanHeader(ImportCell value) => CleanCell(value).ToLowerInvariant();
+
+    private static ImportCell GetCell(List<ImportCell> record, int index) =>
+        index < record.Count ? record[index] : new ImportCell(null);
+
+    private static string CleanCell(ImportCell value) => value.Value switch
+    {
+        null => string.Empty,
+        DateTime date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        double number => number.ToString(CultureInfo.InvariantCulture),
+        float number => number.ToString(CultureInfo.InvariantCulture),
+        decimal number => number.ToString(CultureInfo.InvariantCulture),
+        int number => number.ToString(CultureInfo.InvariantCulture),
+        long number => number.ToString(CultureInfo.InvariantCulture),
+        _ => value.Value.ToString()?.Trim().Trim('"', '\'').Trim() ?? string.Empty,
+    };
+
+    private static bool TryParseDate(ImportCell value, out DateTime date)
+    {
+        if (value.Value is DateTime dateValue)
+        {
+            date = dateValue.Date;
+            return true;
+        }
+
+        if (value.Value is double serialDate && serialDate > 20000 && serialDate < 60000)
+        {
+            date = DateTime.FromOADate(serialDate).Date;
+            return true;
+        }
+
         var formats = new[] { "yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "dd-MM-yyyy", "d-M-yyyy" };
         return DateTime.TryParseExact(
             CleanCell(value),
@@ -193,16 +266,28 @@ public class BankMovementImportService(IBankMovementsRepository bankMovements) :
             out date);
     }
 
-    private static bool TryParseAmount(string value, out decimal amount)
+    private static bool TryParseAmount(ImportCell value, out decimal amount)
     {
+        if (value.Value is double doubleValue)
+        {
+            amount = Convert.ToDecimal(doubleValue, CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        if (value.Value is decimal decimalValue)
+        {
+            amount = decimalValue;
+            return true;
+        }
+
         var normalized = CleanCell(value).Replace(".", string.Empty).Replace(',', '.');
         return decimal.TryParse(normalized, NumberStyles.Number | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out amount);
     }
 
-    private static List<List<string>> ReadCsvRecords(string text)
+    private static List<List<ImportCell>> ReadCsvRecords(string text)
     {
-        var records = new List<List<string>>();
-        var record = new List<string>();
+        var records = new List<List<ImportCell>>();
+        var record = new List<ImportCell>();
         var cell = new StringBuilder();
         var inQuotes = false;
 
@@ -225,7 +310,7 @@ public class BankMovementImportService(IBankMovementsRepository bankMovements) :
 
             if (!inQuotes && current == ';')
             {
-                record.Add(cell.ToString());
+                record.Add(new ImportCell(cell.ToString()));
                 cell.Clear();
                 continue;
             }
@@ -233,7 +318,7 @@ public class BankMovementImportService(IBankMovementsRepository bankMovements) :
             if (!inQuotes && (current == '\n' || current == '\r'))
             {
                 if (current == '\r' && i + 1 < text.Length && text[i + 1] == '\n') i++;
-                record.Add(cell.ToString());
+                record.Add(new ImportCell(cell.ToString()));
                 records.Add(record);
                 record = [];
                 cell.Clear();
@@ -243,11 +328,35 @@ public class BankMovementImportService(IBankMovementsRepository bankMovements) :
             cell.Append(current);
         }
 
-        record.Add(cell.ToString());
-        if (record.Count > 1 || !string.IsNullOrWhiteSpace(record[0])) records.Add(record);
+        record.Add(new ImportCell(cell.ToString()));
+        if (record.Count > 1 || !string.IsNullOrWhiteSpace(CleanCell(record[0]))) records.Add(record);
+        return records;
+    }
+
+    private static List<List<ImportCell>> ReadExcelRecords(byte[] file)
+    {
+        using var stream = new MemoryStream(file);
+        using var reader = ExcelReaderFactory.CreateReader(stream);
+        var records = new List<List<ImportCell>>();
+
+        do
+        {
+            while (reader.Read())
+            {
+                var record = new List<ImportCell>();
+                for (var i = 0; i < reader.FieldCount; i++)
+                {
+                    record.Add(new ImportCell(reader.GetValue(i)));
+                }
+                records.Add(record);
+            }
+        } while (reader.NextResult() && records.Count == 0);
+
         return records;
     }
 }
+
+internal readonly record struct ImportCell(object? Value);
 
 public static class BankMovementImportRowStatus
 {
