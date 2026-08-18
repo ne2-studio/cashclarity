@@ -1,4 +1,5 @@
 using CashClarity.Api.Controllers;
+using CashClarity.Api.Domain;
 using CashClarity.Api.Lite;
 using CashClarity.Api.Repositories;
 using Microsoft.AspNetCore.Authentication;
@@ -17,8 +18,19 @@ builder.Services.AddCors(options =>
         .WithMethods("GET", "POST", "PATCH", "DELETE", "OPTIONS")
         .WithExposedHeaders("Content-Length")));
 
-builder.Services.AddSingleton<IFinanceRepository, InMemoryFinanceRepository>();
-builder.Services.AddControllers().AddApplicationPart(typeof(FinanceController).Assembly);
+builder.Services.AddSingleton<List<JournalEntryResponse>>();
+builder.Services.AddSingleton<List<BankMovementResponse>>();
+builder.Services.AddSingleton<IAccountsRepository>(services =>
+    new InMemoryAccountsRepository(
+        services.GetRequiredService<List<JournalEntryResponse>>(),
+        services.GetRequiredService<List<BankMovementResponse>>()));
+builder.Services.AddSingleton<IJournalEntriesRepository>(services =>
+    new InMemoryJournalEntriesRepository(
+        services.GetRequiredService<List<JournalEntryResponse>>(),
+        services.GetRequiredService<List<BankMovementResponse>>()));
+builder.Services.AddSingleton<IBankMovementsRepository>(services =>
+    new InMemoryBankMovementsRepository(services.GetRequiredService<List<BankMovementResponse>>()));
+builder.Services.AddControllers().AddApplicationPart(typeof(AccountsController).Assembly);
 builder.Services.AddEndpointsApiExplorer();
 
 builder.Services

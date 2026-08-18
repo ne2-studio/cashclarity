@@ -20,7 +20,9 @@ builder.Services.AddCors(options =>
 
 var databaseUrl = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<FinanceDbContext>(opts => opts.UseNpgsql(databaseUrl));
-builder.Services.AddScoped<IFinanceRepository, FinanceRepository>();
+builder.Services.AddScoped<IAccountsRepository, AccountsRepository>();
+builder.Services.AddScoped<IJournalEntriesRepository, JournalEntriesRepository>();
+builder.Services.AddScoped<IBankMovementsRepository, BankMovementsRepository>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>

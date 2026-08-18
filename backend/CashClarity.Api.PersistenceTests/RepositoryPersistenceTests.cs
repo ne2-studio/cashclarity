@@ -6,14 +6,14 @@ using Xunit;
 namespace CashClarity.Api.PersistenceTests;
 
 [Collection(PersistenceCollection.Name)]
-public class FinanceRepositoryPersistenceTests(PostgresFixture fixture)
+public class RepositoryPersistenceTests(PostgresFixture fixture)
 {
     [Fact]
     public async Task System_accounts_use_real_unique_constraint_without_duplicates()
     {
         await ResetDatabase();
         await using var db = fixture.CreateDbContext();
-        var repo = new FinanceRepository(db);
+        var repo = new AccountsRepository(db);
 
         await repo.GetAccounts("user-a");
         var accounts = await repo.GetAccounts("user-a");
@@ -27,14 +27,15 @@ public class FinanceRepositoryPersistenceTests(PostgresFixture fixture)
     {
         await ResetDatabase();
         await using var db = fixture.CreateDbContext();
-        var repo = new FinanceRepository(db);
-        var account = await repo.AddAccount(new AccountCreateRequest("5721", "Banco", "main"), "user-a");
-        var entry = await repo.AddJournalEntry(new JournalEntryCreateRequest(
+        var accountsRepo = new AccountsRepository(db);
+        var journalEntriesRepo = new JournalEntriesRepository(db);
+        var account = await accountsRepo.AddAccount(new AccountCreateRequest("5721", "Banco", "main"), "user-a");
+        var entry = await journalEntriesRepo.AddJournalEntry(new JournalEntryCreateRequest(
             "2026-08-16",
             "Movimiento",
             [new JournalLineRequest(account.Id, 5m, 0m)]), "user-a");
 
-        await repo.DeleteJournalEntry(entry.Id, "user-a");
+        await journalEntriesRepo.DeleteJournalEntry(entry.Id, "user-a");
 
         Assert.Empty(await db.JournalLines.ToListAsync());
     }

@@ -4,12 +4,12 @@ using Xunit;
 
 namespace CashClarity.Api.Tests;
 
-public class InMemoryFinanceRepositoryTests
+public class InMemoryRepositoriesTests
 {
     [Fact]
     public async Task GetAccounts_creates_system_accounts_per_user()
     {
-        var repo = new InMemoryFinanceRepository();
+        var repo = new InMemoryAccountsRepository();
 
         var userA = await repo.GetAccounts("user-a");
         var userB = await repo.GetAccounts("user-b");
@@ -22,7 +22,7 @@ public class InMemoryFinanceRepositoryTests
     [Fact]
     public async Task Journal_entries_are_isolated_by_user()
     {
-        var repo = new InMemoryFinanceRepository();
+        var repo = new InMemoryJournalEntriesRepository();
 
         await repo.AddJournalEntry(new JournalEntryCreateRequest(
             "2026-08-16",
