@@ -11,6 +11,19 @@ interface BucketSummarySectionProps {
   formatCurrency: (value: number) => string;
 }
 
+export function calculateLiquidityRatios(realBankBalance: number, totalCommitted: number, availableCash: number) {
+  const committedRatio = realBankBalance > 0 ? totalCommitted / realBankBalance : 0;
+  const availableRatio = realBankBalance > 0 ? availableCash / realBankBalance : 0;
+  const toPercentWidth = (value: number) => `${Math.min(Math.max(value, 0), 1) * 100}%`;
+
+  return {
+    committedRatio,
+    availableRatio,
+    committedWidth: toPercentWidth(committedRatio),
+    availableWidth: toPercentWidth(availableRatio),
+  };
+}
+
 export function BucketSummarySection({
   availableCash,
   bucketBalances,
@@ -19,6 +32,12 @@ export function BucketSummarySection({
   realBankBalance,
   formatCurrency,
 }: BucketSummarySectionProps) {
+  const { committedRatio, committedWidth, availableWidth } = calculateLiquidityRatios(
+    realBankBalance,
+    totalCommitted,
+    availableCash,
+  );
+
   return (
     <section>
       <SectionHeader title="Espacios // Reservas y Provisiones" />
@@ -68,17 +87,17 @@ export function BucketSummarySection({
               <div className="flex items-center justify-between">
                 <span className="text-sm text-text-secondary">Ratio de Reserva</span>
                 <span className="text-sm font-bold numeric">
-                  {new Intl.NumberFormat('es-ES', { style: 'percent' }).format(totalCommitted / realBankBalance)}
+                  {new Intl.NumberFormat('es-ES', { style: 'percent' }).format(committedRatio)}
                 </span>
               </div>
               <div className="w-full h-2 bg-background border border-border rounded-full overflow-hidden flex">
                 <div
                   className="h-full bg-primary-orange"
-                  style={{ width: `${(totalCommitted / realBankBalance) * 100}%` }}
+                  style={{ width: committedWidth }}
                 />
                 <div
                   className="h-full bg-primary-green"
-                  style={{ width: `${(availableCash / realBankBalance) * 100}%` }}
+                  style={{ width: availableWidth }}
                 />
               </div>
               <div className="flex gap-4 text-[9px] font-mono uppercase">
