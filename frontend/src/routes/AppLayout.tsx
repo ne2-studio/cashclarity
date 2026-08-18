@@ -1,5 +1,4 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   PiggyBank,
@@ -10,6 +9,7 @@ import {
   Landmark,
   LogOut,
 } from 'lucide-react';
+import { SidebarActionItem, SidebarNavItem } from '../design-system';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -42,33 +42,16 @@ export function AppLayout({ children, onLogout }: AppLayoutProps) {
         <nav className="w-64 bg-surface border-r border-border flex flex-col">
           <div className="flex-1 py-6">
             {navItems.map((item) => (
-              <NavLink
-                key={item.id}
-                to={item.path}
-                className={({ isActive }) => `w-full flex items-center gap-3 px-6 py-2.5 text-sm font-medium transition-all duration-200 border-r-2 ${
-                  isActive
-                    ? 'bg-surface-elevated text-text-primary border-primary-orange'
-                    : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-surface-elevated/50'
-                }`}
-              >
-                {({ isActive }) => (
-                  <>
-                    <item.icon className={`w-4 h-4 ${isActive ? 'text-primary-orange' : ''}`} />
-                    {item.label}
-                  </>
-                )}
-              </NavLink>
+              <SidebarNavItem key={item.id} to={item.path} icon={item.icon}>
+                {item.label}
+              </SidebarNavItem>
             ))}
           </div>
 
           <div className="p-4 border-t border-border">
-            <button
-              onClick={onLogout}
-              className="w-full flex items-center gap-3 px-6 py-2.5 text-sm font-medium text-text-secondary hover:text-primary-orange hover:bg-surface-elevated/50 transition-all duration-200 rounded-sm"
-            >
-              <LogOut className="w-4 h-4" />
+            <SidebarActionItem icon={LogOut} onClick={onLogout}>
               Cerrar Sesión
-            </button>
+            </SidebarActionItem>
           </div>
 
           <div className="p-6 border-t border-border text-[10px] font-mono text-text-secondary uppercase tracking-widest opacity-50">

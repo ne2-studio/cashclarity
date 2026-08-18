@@ -1,4 +1,3 @@
-import React from 'react';
 import { 
   PiggyBank, 
   Wallet,
@@ -7,6 +6,7 @@ import {
 
 import { Account } from '../types';
 import { useDashboardViewModel } from '../hooks/accountViews';
+import { Card, SectionHeader, StatCard } from '../design-system';
 
 interface DashboardProps {
   accounts: Account[];
@@ -25,42 +25,6 @@ export function Dashboard({ accounts, metrics }: DashboardProps) {
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(val);
 
-  const StatCard = ({ title, value, icon: Icon, type = 'neutral', subtext = '' }: { 
-    title: string; 
-    value: number | string; 
-    icon: React.ElementType; 
-    type?: 'positive' | 'negative' | 'warning' | 'neutral'; 
-    subtext?: string; 
-  }) => {
-    const colorClass = 
-      type === 'positive' ? 'text-primary-green' : 
-      type === 'negative' ? 'text-error' : 
-      type === 'warning' ? 'text-primary-orange' : 
-      'text-text-primary';
-
-    return (
-      <div className="financial-card flex flex-col gap-1">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-text-secondary">{title}</span>
-          <Icon className={`w-3.5 h-3.5 ${colorClass} opacity-80`} />
-        </div>
-        <div className={`text-xl font-bold numeric ${colorClass}`}>
-          {typeof value === 'number' ? formatCurrency(value) : value}
-        </div>
-        {subtext && <div className="text-[10px] text-text-secondary font-mono mt-1 opacity-60">{subtext}</div>}
-      </div>
-    );
-  };
-
-  const SectionHeader = ({ title }: { title: string }) => (
-    <div className="flex items-center gap-4 mb-6">
-      <h2 className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-text-secondary whitespace-nowrap">
-        {title}
-      </h2>
-      <div className="h-px w-full bg-border" />
-    </div>
-  );
-
   return (
     <div className="flex flex-col gap-12">
       {/* Cash Visibility Section */}
@@ -69,23 +33,23 @@ export function Dashboard({ accounts, metrics }: DashboardProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatCard 
             title="Saldo Bancario Real" 
-            value={realBankBalance} 
+            value={formatCurrency(realBankBalance)} 
             icon={Wallet} 
-            type="positive" 
+            tone="positive"
             subtext="Total consolidado en bancos"
           />
           <StatCard 
             title="Saldo Comprometido" 
-            value={totalCommitted} 
+            value={formatCurrency(totalCommitted)}
             icon={PiggyBank} 
-            type="warning"
+            tone="warning"
             subtext="Asignado a espacios de reserva"
           />
           <StatCard 
             title="Saldo Disponible" 
-            value={availableCash} 
+            value={formatCurrency(availableCash)}
             icon={ShieldCheck} 
-            type={availableCash >= 0 ? 'positive' : 'negative'}
+            tone={availableCash >= 0 ? 'positive' : 'negative'}
             subtext="Caja libre para operaciones"
           />
         </div>
@@ -96,7 +60,7 @@ export function Dashboard({ accounts, metrics }: DashboardProps) {
         <SectionHeader title="Espacios // Reservas y Provisiones" />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div>
-            <div className="bg-surface border border-border rounded-sm overflow-hidden">
+            <Card className="overflow-hidden">
               <table className="w-full">
                 <thead>
                   <tr>
@@ -130,7 +94,7 @@ export function Dashboard({ accounts, metrics }: DashboardProps) {
                   })}
                 </tbody>
               </table>
-            </div>
+            </Card>
           </div>
 
           <div className="flex flex-col gap-4">

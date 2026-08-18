@@ -10,7 +10,6 @@ import {
   CheckCircle2, 
   Circle, 
   X, 
-  AlertCircle,
   ArrowUpRight,
   ArrowDownLeft,
   Search,
@@ -25,6 +24,7 @@ import {
   toEditableJournalEntry,
   validateJournalEntry,
 } from '../hooks/journalEntryLogic';
+import { Button, Card, FormField, IconButton, Input } from '../design-system';
 
 interface BankStatementProps {
   accounts: Account[];
@@ -188,80 +188,74 @@ export function BankStatement({
         </div>
         
         <div className="flex items-center gap-3">
-          <button 
+          <Button
+            variant="secondary"
             onClick={handleImportCSV}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest text-text-secondary border border-border hover:bg-surface-elevated transition-all rounded-sm"
+            icon={<Upload className="w-3.5 h-3.5" />}
           >
-            <Upload className="w-3.5 h-3.5" /> Importar CSV
-          </button>
-          <button 
+            Importar CSV
+          </Button>
+          <Button
+            size="sm"
             onClick={() => setIsAdding(true)}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest bg-primary-green text-background hover:bg-primary-green/90 transition-all rounded-sm"
+            icon={<Plus className="w-3.5 h-3.5" />}
           >
-            <Plus className="w-3.5 h-3.5" /> Nuevo Movimiento
-          </button>
+            Nuevo Movimiento
+          </Button>
         </div>
       </div>
 
       {isAdding && (
-        <div className="bg-surface border border-border p-6 rounded-sm animate-in fade-in slide-in-from-top-2 duration-300">
+        <Card className="p-6 animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-[10px] font-mono uppercase tracking-widest text-text-secondary">Registrar Movimiento Manual</h3>
-            <button onClick={() => setIsAdding(false)} className="text-text-secondary hover:text-text-primary">
+            <IconButton onClick={() => setIsAdding(false)} hover="default" aria-label="Cerrar formulario">
               <X className="w-4 h-4" />
-            </button>
+            </IconButton>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-mono uppercase tracking-wider text-text-secondary">Fecha</label>
-              <input 
+            <FormField label="Fecha">
+              <Input
                 type="date" 
                 value={newMovement.date}
                 onChange={e => setNewMovement(prev => ({ ...prev, date: e.target.value }))}
-                className="bg-background border border-border p-2 text-sm rounded-sm focus:ring-1 focus:ring-primary-orange outline-none"
+                tone="orange"
               />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-mono uppercase tracking-wider text-text-secondary">Concepto</label>
-              <input 
+            </FormField>
+            <FormField label="Concepto">
+              <Input
                 type="text" 
                 value={newMovement.description}
                 onChange={e => setNewMovement(prev => ({ ...prev, description: e.target.value }))}
                 placeholder="Ej: Transferencia Recibida"
-                className="bg-background border border-border p-2 text-sm rounded-sm focus:ring-1 focus:ring-primary-orange outline-none"
+                tone="orange"
               />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-mono uppercase tracking-wider text-text-secondary">Importe (+ Ingreso, - Gasto)</label>
-              <input 
+            </FormField>
+            <FormField label="Importe (+ Ingreso, - Gasto)">
+              <Input
                 type="number" 
                 step="0.01"
                 value={newMovement.amount}
                 onChange={e => setNewMovement(prev => ({ ...prev, amount: e.target.value }))}
                 placeholder="0.00"
-                className="bg-background border border-border p-2 text-sm rounded-sm focus:ring-1 focus:ring-primary-orange outline-none font-mono"
+                tone="orange"
+                className="font-mono"
               />
-            </div>
+            </FormField>
           </div>
           <div className="flex justify-end gap-3">
-            <button 
-              onClick={() => setIsAdding(false)}
-              className="px-6 py-2 text-xs font-bold uppercase tracking-widest text-text-secondary hover:text-text-primary transition-all"
-            >
+            <Button variant="ghost" onClick={() => setIsAdding(false)}>
               Cancelar
-            </button>
-            <button 
-              onClick={handleAddMovement}
-              className="bg-primary-green text-background px-6 py-2 text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-primary-green/90 transition-all"
-            >
+            </Button>
+            <Button onClick={handleAddMovement}>
               Guardar Movimiento
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Movements Table */}
-      <div className="bg-surface border border-border rounded-sm overflow-hidden">
+      <Card className="overflow-hidden">
         <div className="p-4 border-b border-border flex items-center justify-between bg-surface-elevated/20">
           <h4 className="text-[10px] font-mono uppercase tracking-widest text-text-secondary">Extracto de Movimientos Bancarios</h4>
           <div className="flex items-center gap-4">
@@ -331,16 +325,16 @@ export function BankStatement({
                       ) : (
                         <div className="flex items-center gap-2 group/desc overflow-hidden">
                           <span className="text-xs font-medium truncate">{m.description}</span>
-                          <button 
+                          <IconButton
                             onClick={() => {
                               setEditingDescriptionId(m.id);
                               setTempDescription(m.description);
                             }}
-                            className="p-1 text-text-secondary hover:text-primary-orange opacity-0 group-hover/desc:opacity-100 transition-all flex-shrink-0"
+                            className="p-1 opacity-0 group-hover/desc:opacity-100 flex-shrink-0"
                             title="Editar descripción"
                           >
                             <FileEdit className="w-3 h-3" />
-                          </button>
+                          </IconButton>
                         </div>
                       )}
                     </div>
@@ -361,41 +355,39 @@ export function BankStatement({
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-1">
                       {m.amount > 0 && (
-                        <button 
+                        <IconButton
                           onClick={() => {
                             setReservingMovement(m);
                           }}
-                          className="p-1.5 text-text-secondary hover:text-primary-orange transition-all"
                           title="Reservar Fondos"
                         >
                           <PiggyBank className="w-3.5 h-3.5" />
-                        </button>
+                        </IconButton>
                       )}
 
                       {m.amount < 0 && (
-                        <button 
+                        <IconButton
                           onClick={() => setPayingFromSpaceMovement(m)}
-                          className="p-1.5 text-text-secondary hover:text-primary-orange transition-all"
                           title="Pagar desde Espacio"
                         >
                           <Wallet className="w-3.5 h-3.5" />
-                        </button>
+                        </IconButton>
                       )}
 
-                      <button 
+                      <IconButton
                         onClick={() => startEditingEntry(m)}
-                        className="p-1.5 text-text-secondary hover:text-primary-orange transition-all"
                         title="Editar Asiento Completo"
                       >
                         <FileEdit className="w-3.5 h-3.5" />
-                      </button>
+                      </IconButton>
                       
-                      <button 
+                      <IconButton
                         onClick={() => onDeleteBankMovement(m.id)}
-                        className="p-1.5 text-text-secondary hover:text-primary-orange opacity-0 group-hover:opacity-100 transition-all"
+                        className="opacity-0 group-hover:opacity-100"
+                        title="Eliminar movimiento"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      </IconButton>
                     </div>
                   </td>
                 </tr>
@@ -413,7 +405,7 @@ export function BankStatement({
             )}
           </tbody>
         </table>
-      </div>
+      </Card>
 
       {/* Import Modal */}
       {isImporting && (

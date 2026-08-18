@@ -1,8 +1,8 @@
 import React, { useState, ChangeEvent } from 'react';
-import { Upload, X, CheckCircle2, AlertCircle } from 'lucide-react';
 
 import { BankMovement } from '../types';
 import { parseBankMovementsCsv } from '../hooks/csvImport';
+import { Button, Modal } from '../design-system';
 
 interface ImportCSVProps {
   onClose: () => void;
@@ -44,15 +44,19 @@ export function ImportCSV({ onClose, onAddBankMovement }: ImportCSVProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-surface border border-border w-full max-w-2xl rounded-sm shadow-2xl animate-in zoom-in-95 duration-200">
-        <div className="p-6 border-b border-border flex items-center justify-between bg-surface-elevated/20">
-          <h3 className="text-sm font-bold uppercase tracking-widest">Importar Movimientos CSV</h3>
-          <button onClick={onClose} className="text-text-secondary hover:text-text-primary">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="p-8 flex flex-col gap-6">
+    <Modal
+      title="Importar Movimientos CSV"
+      onClose={onClose}
+      width="2xl"
+      footer={(
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={confirmImport} disabled={importPreview.length === 0}>
+            Importar {importPreview.length > 0 ? importPreview.length : ''} Movimientos
+          </Button>
+        </>
+      )}
+    >
           <div className="flex flex-col gap-4">
             <p className="text-xs text-text-secondary">
               Selecciona un archivo CSV con formato separado por punto y coma (;) y las columnas: <span className="font-mono font-bold">fecha; Concepto; cantidad</span>
@@ -97,23 +101,6 @@ export function ImportCSV({ onClose, onAddBankMovement }: ImportCSVProps) {
               <p className="text-[10px] text-text-secondary italic">Se han detectado {importPreview.length} movimientos válidos.</p>
             </div>
           )}
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-border">
-            <button onClick={onClose} className="px-6 py-2 text-xs font-bold uppercase tracking-widest text-text-secondary">Cancelar</button>
-            <button 
-              onClick={confirmImport} 
-              disabled={importPreview.length === 0}
-              className={`px-6 py-2 text-xs font-bold uppercase tracking-widest rounded-sm transition-all ${
-                importPreview.length > 0 
-                  ? 'bg-primary-green text-background hover:bg-primary-green/90' 
-                  : 'bg-border text-text-secondary cursor-not-allowed'
-              }`}
-            >
-              Importar {importPreview.length > 0 ? importPreview.length : ''} Movimientos
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

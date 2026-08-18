@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { 
-  Search, 
   History
 } from 'lucide-react';
 import { JournalEntry, Account } from '../types';
 import { useJournalLines } from '../hooks/ledgerViews';
+import { Card, PageHeader, SearchField } from '../design-system';
 
 interface JournalProps {
   journalEntries: JournalEntry[];
@@ -21,30 +21,22 @@ export function Journal({ journalEntries, accounts }: JournalProps) {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-medium tracking-tight text-text-primary flex items-center gap-2">
-            <History className="w-4 h-4 text-text-secondary" />
-            Libro Diario // Registro Contable
-          </h2>
-          <p className="text-xs text-text-secondary">Asientos y apuntes contables</p>
-        </div>
-      </div>
+      <PageHeader
+        icon={<History className="w-4 h-4 text-text-secondary" />}
+        title="Libro Diario // Registro Contable"
+        subtitle="Asientos y apuntes contables"
+      />
 
-      <div className="flex items-center gap-4 bg-surface border border-border p-4 rounded-sm">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
-          <input 
-            type="text" 
-            placeholder="Buscar por concepto o cuenta..." 
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="w-full bg-background border border-border pl-10 pr-4 py-2 text-sm rounded-sm focus:ring-1 focus:ring-primary-green outline-none"
-          />
-        </div>
-      </div>
+      <Card className="flex items-center gap-4 p-4">
+        <SearchField
+          className="flex-1"
+          placeholder="Buscar por concepto o cuenta..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+        />
+      </Card>
 
-      <div className="bg-surface border border-border rounded-sm overflow-hidden">
+      <Card className="overflow-hidden">
         <table className="w-full text-left">
           <thead>
             <tr className="bg-surface-elevated/50 border-b border-border">
@@ -89,7 +81,7 @@ export function Journal({ journalEntries, accounts }: JournalProps) {
             )}
           </tbody>
         </table>
-      </div>
+      </Card>
     </div>
   );
 }

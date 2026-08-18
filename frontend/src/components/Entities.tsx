@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import { 
   Users, 
   Plus, 
-  Search, 
   Tag, 
   MoreHorizontal,
   History,
@@ -10,6 +9,7 @@ import {
 import { Account, JournalEntry } from '../types';
 import { getAccountSummary, useEntityLedger } from '../hooks/ledgerViews';
 import { getEntityAccounts, isValidAccountCode } from '../hooks/accountViews';
+import { Button, Card, FormField, IconButton, Input, PageHeader, SearchField, StatCard } from '../design-system';
 
 interface EntitiesProps {
   accounts: Account[];
@@ -54,78 +54,58 @@ export function Entities({ accounts, journalEntries, onAddAccount }: EntitiesPro
   return (
     <div className="flex flex-col gap-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-medium tracking-tight text-text-primary flex items-center gap-2">
-            <Users className="w-4 h-4 text-text-secondary" />
-            Entidades // Clientes, Proveedores y Otros
-          </h2>
-          <p className="text-xs text-text-secondary">Gestión de contrapartes y flujo de caja por entidad</p>
-        </div>
-        <button 
-          onClick={() => setIsAdding(true)}
-          className="bg-primary-green text-background px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-primary-green/90 transition-all flex items-center gap-2"
-        >
-          <Plus className="w-3.5 h-3.5" /> Nueva Entidad
-        </button>
-      </div>
+      <PageHeader
+        icon={<Users className="w-4 h-4 text-text-secondary" />}
+        title="Entidades // Clientes, Proveedores y Otros"
+        subtitle="Gestión de contrapartes y flujo de caja por entidad"
+        actions={(
+          <Button size="sm" onClick={() => setIsAdding(true)} icon={<Plus className="w-3.5 h-3.5" />}>
+            Nueva Entidad
+          </Button>
+        )}
+      />
 
       {isAdding && (
-        <div className="bg-surface border border-border p-6 rounded-sm animate-in fade-in slide-in-from-top-2 duration-300">
+        <Card className="p-6 animate-in fade-in slide-in-from-top-2 duration-300">
           <h3 className="text-[10px] font-mono uppercase tracking-widest text-text-secondary mb-6">Crear Nueva Entidad</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-mono uppercase tracking-wider text-text-secondary">Código (4 dígitos)</label>
-              <input 
+            <FormField label="Código (4 dígitos)">
+              <Input
                 type="text" 
                 value={newEntity.code}
                 onChange={e => setNewEntity(prev => ({ ...prev, code: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
                 placeholder="Ej: 4300"
-                className="bg-background border border-border p-2 text-sm rounded-sm focus:ring-1 focus:ring-primary-green outline-none"
               />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-mono uppercase tracking-wider text-text-secondary">Nombre</label>
-              <input 
+            </FormField>
+            <FormField label="Nombre">
+              <Input
                 type="text" 
                 value={newEntity.name}
                 onChange={e => setNewEntity(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="Ej: Cliente A"
-                className="bg-background border border-border p-2 text-sm rounded-sm focus:ring-1 focus:ring-primary-green outline-none"
               />
-            </div>
+            </FormField>
           </div>
           <div className="flex justify-end gap-3">
-            <button 
-              onClick={() => setIsAdding(false)}
-              className="px-6 py-2 text-xs font-bold uppercase tracking-widest text-text-secondary hover:text-text-primary transition-all"
-            >
+            <Button variant="ghost" onClick={() => setIsAdding(false)}>
               Cancelar
-            </button>
-            <button 
-              onClick={handleAddEntity}
-              className="bg-primary-green text-background px-6 py-2 text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-primary-green/90 transition-all"
-            >
+            </Button>
+            <Button onClick={handleAddEntity}>
               Crear Entidad
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Entity List */}
         <div className="lg:col-span-1 flex flex-col gap-4">
           {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
-            <input 
-              type="text" 
-              placeholder="Buscar entidad..." 
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full bg-surface border border-border pl-10 pr-4 py-2 text-sm rounded-sm focus:ring-1 focus:ring-primary-green outline-none"
-            />
-          </div>
+          <SearchField
+            placeholder="Buscar entidad..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
 
           <div className="flex flex-col gap-2 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
             {filteredEntities.map((e: Account) => {
@@ -180,30 +160,19 @@ export function Entities({ accounts, journalEntries, onAddAccount }: EntitiesPro
                   <h3 className="text-lg font-medium tracking-tight text-text-primary uppercase tracking-widest">{selectedEntity.name}</h3>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-elevated rounded-sm transition-all">
+                  <IconButton size="md" hover="default" aria-label="Más opciones">
                     <MoreHorizontal className="w-4 h-4" />
-                  </button>
+                  </IconButton>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-surface border border-border p-4 rounded-sm">
-                  <h4 className="text-[10px] font-mono uppercase tracking-widest text-text-secondary mb-2">Entradas Totales</h4>
-                  <p className="text-lg font-bold numeric text-primary-green">{formatCurrency(selectedEntityStats.totalIn)}</p>
-                </div>
-                <div className="bg-surface border border-border p-4 rounded-sm">
-                  <h4 className="text-[10px] font-mono uppercase tracking-widest text-text-secondary mb-2">Salidas Totales</h4>
-                  <p className="text-lg font-bold numeric text-primary-orange">{formatCurrency(selectedEntityStats.totalOut)}</p>
-                </div>
-                <div className="bg-surface border border-border p-4 rounded-sm">
-                  <h4 className="text-[10px] font-mono uppercase tracking-widest text-text-secondary mb-2">Flujo Neto</h4>
-                  <p className={`text-lg font-bold numeric ${selectedEntityStats.net >= 0 ? 'text-primary-green' : 'text-primary-orange'}`}>
-                    {formatCurrency(selectedEntityStats.net)}
-                  </p>
-                </div>
+                <StatCard title="Entradas Totales" value={formatCurrency(selectedEntityStats.totalIn)} tone="positive" />
+                <StatCard title="Salidas Totales" value={formatCurrency(selectedEntityStats.totalOut)} tone="warning" />
+                <StatCard title="Flujo Neto" value={formatCurrency(selectedEntityStats.net)} tone={selectedEntityStats.net >= 0 ? 'positive' : 'warning'} />
               </div>
 
-              <div className="bg-surface border border-border rounded-sm overflow-hidden">
+              <Card className="overflow-hidden">
                 <div className="p-4 border-b border-border flex items-center justify-between bg-surface-elevated/20">
                   <h4 className="text-[10px] font-mono uppercase tracking-widest text-text-secondary flex items-center gap-2">
                     <History className="w-3.5 h-3.5" /> Extracto Virtual de Movimientos
@@ -237,7 +206,7 @@ export function Entities({ accounts, journalEntries, onAddAccount }: EntitiesPro
                     )}
                   </tbody>
                 </table>
-              </div>
+              </Card>
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center p-12 border border-dashed border-border rounded-sm bg-surface/30">

@@ -11,6 +11,7 @@ import {
 import { Account, JournalEntry } from '../types';
 import { isValidAccountCode, useSpaceAccounts } from '../hooks/accountViews';
 import { useSpaceLedger } from '../hooks/ledgerViews';
+import { Button, Card, FormField, IconButton, Input, PageHeader } from '../design-system';
 
 interface SpacesProps {
   accounts: Account[];
@@ -44,62 +45,47 @@ export function Spaces({ accounts, journalEntries, bucketBalances, onAddAccount,
   return (
     <div className="flex flex-col gap-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-medium tracking-tight text-text-primary flex items-center gap-2">
-            <PiggyBank className="w-4 h-4 text-primary-orange" />
-            Espacios de Reserva
-          </h2>
-          <p className="text-xs text-text-secondary">Gestión de fondos comprometidos y provisiones</p>
-        </div>
-        <button 
-          onClick={() => setIsAdding(true)}
-          className="bg-primary-green text-background px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-primary-green/90 transition-all flex items-center gap-2"
-        >
-          <Plus className="w-3.5 h-3.5" /> Nuevo Espacio
-        </button>
-      </div>
+      <PageHeader
+        icon={<PiggyBank className="w-4 h-4 text-primary-orange" />}
+        title="Espacios de Reserva"
+        subtitle="Gestión de fondos comprometidos y provisiones"
+        actions={(
+          <Button size="sm" onClick={() => setIsAdding(true)} icon={<Plus className="w-3.5 h-3.5" />}>
+            Nuevo Espacio
+          </Button>
+        )}
+      />
 
       {isAdding && (
-        <div className="bg-surface border border-border p-6 rounded-sm animate-in fade-in slide-in-from-top-2 duration-300">
+        <Card className="p-6 animate-in fade-in slide-in-from-top-2 duration-300">
           <h3 className="text-[10px] font-mono uppercase tracking-widest text-text-secondary mb-6">Crear Nuevo Espacio</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-mono uppercase tracking-wider text-text-secondary">Código (4 dígitos)</label>
-              <input 
+            <FormField label="Código (4 dígitos)">
+              <Input
                 type="text" 
                 value={newBucket.code}
                 onChange={e => setNewBucket(prev => ({ ...prev, code: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
                 placeholder="Ej: 5722"
-                className="bg-background border border-border p-2 text-sm rounded-sm focus:ring-1 focus:ring-primary-green outline-none"
               />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-mono uppercase tracking-wider text-text-secondary">Nombre</label>
-              <input 
+            </FormField>
+            <FormField label="Nombre">
+              <Input
                 type="text" 
                 value={newBucket.name}
                 onChange={e => setNewBucket(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="Ej: Reserva IVA"
-                className="bg-background border border-border p-2 text-sm rounded-sm focus:ring-1 focus:ring-primary-green outline-none"
               />
-            </div>
+            </FormField>
           </div>
           <div className="flex justify-end gap-3">
-            <button 
-              onClick={() => setIsAdding(false)}
-              className="px-6 py-2 text-xs font-bold uppercase tracking-widest text-text-secondary hover:text-text-primary transition-all"
-            >
+            <Button variant="ghost" onClick={() => setIsAdding(false)}>
               Cancelar
-            </button>
-            <button 
-              onClick={handleAddBucket}
-              className="bg-primary-green text-background px-6 py-2 text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-primary-green/90 transition-all"
-            >
+            </Button>
+            <Button onClick={handleAddBucket}>
               Crear Espacio
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -171,18 +157,18 @@ export function Spaces({ accounts, journalEntries, bucketBalances, onAddAccount,
                 <div className="flex items-center gap-2">
                   {selectedBucket.type !== 'main' && (
                     <>
-                      <button className="p-2 text-text-secondary hover:text-text-primary hover:bg-surface-elevated rounded-sm transition-all">
+                      <IconButton size="md" hover="default" aria-label="Editar espacio">
                         <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => onDeleteAccount(selectedBucket.id)} className="p-2 text-text-secondary hover:text-primary-orange hover:bg-primary-orange/10 rounded-sm transition-all">
+                      </IconButton>
+                      <IconButton size="md" onClick={() => onDeleteAccount(selectedBucket.id)} aria-label="Eliminar espacio">
                         <Trash2 className="w-4 h-4" />
-                      </button>
+                      </IconButton>
                     </>
                   )}
                 </div>
               </div>
 
-              <div className="bg-surface border border-border rounded-sm overflow-hidden">
+              <Card className="overflow-hidden">
                 <div className="p-4 border-b border-border flex items-center justify-between bg-surface-elevated/20">
                   <h4 className="text-[10px] font-mono uppercase tracking-widest text-text-secondary flex items-center gap-2">
                     <History className="w-3.5 h-3.5" /> Extracto Virtual de Movimientos
@@ -216,7 +202,7 @@ export function Spaces({ accounts, journalEntries, bucketBalances, onAddAccount,
                     )}
                   </tbody>
                 </table>
-              </div>
+              </Card>
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center p-12 border border-dashed border-border rounded-sm bg-surface/30">

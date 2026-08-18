@@ -2,13 +2,12 @@ import { useState } from 'react';
 import { 
   Zap, 
   Plus, 
-  Search, 
   Trash2, 
   Edit2,
-  AlertCircle
 } from 'lucide-react';
 import { Account, AccountType, JournalEntry } from '../types';
 import { isValidAccountCode, useChartOfAccountsViewModel } from '../hooks/accountViews';
+import { Button, Card, FormField, IconButton, Input, PageHeader, SearchField, Select } from '../design-system';
 
 interface ChartOfAccountsProps {
   accounts: Account[];
@@ -40,79 +39,64 @@ export function ChartOfAccounts({ accounts, journalEntries, onAddAccount, onDele
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-medium tracking-tight text-text-primary flex items-center gap-2">
-            <Zap className="w-4 h-4 text-primary-orange" />
-            Plan Contable
-          </h2>
-          <p className="text-xs text-text-secondary">Gestión de cuentas y estructura financiera</p>
-        </div>
-        <button 
-          onClick={() => setIsAdding(true)}
-          className="bg-primary-green text-background px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-primary-green/90 transition-all flex items-center gap-2"
-        >
-          <Plus className="w-3.5 h-3.5" /> Nueva Cuenta
-        </button>
-      </div>
+      <PageHeader
+        icon={<Zap className="w-4 h-4 text-primary-orange" />}
+        title="Plan Contable"
+        subtitle="Gestión de cuentas y estructura financiera"
+        actions={(
+          <Button size="sm" onClick={() => setIsAdding(true)} icon={<Plus className="w-3.5 h-3.5" />}>
+            Nueva Cuenta
+          </Button>
+        )}
+      />
 
       {isAdding && (
-        <div className="bg-surface border border-border p-6 rounded-sm animate-in fade-in slide-in-from-top-2 duration-300">
+        <Card className="p-6 animate-in fade-in slide-in-from-top-2 duration-300">
           <h3 className="text-[10px] font-mono uppercase tracking-widest text-text-secondary mb-6">Crear Nueva Cuenta</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-mono uppercase tracking-wider text-text-secondary">Código (4 dígitos)</label>
-              <input 
+            <FormField label="Código (4 dígitos)">
+              <Input
                 type="text" 
                 value={newAccount.code}
                 onChange={e => setNewAccount(prev => ({ ...prev, code: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
                 placeholder="Ej: 5721"
-                className="bg-background border border-border p-2 text-sm rounded-sm focus:ring-1 focus:ring-primary-green outline-none"
               />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-mono uppercase tracking-wider text-text-secondary">Nombre</label>
-              <input 
+            </FormField>
+            <FormField label="Nombre">
+              <Input
                 type="text" 
                 value={newAccount.name}
                 onChange={e => setNewAccount(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="Ej: Banco Sabadell"
-                className="bg-background border border-border p-2 text-sm rounded-sm focus:ring-1 focus:ring-primary-green outline-none"
               />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-mono uppercase tracking-wider text-text-secondary">Tipo</label>
-              <select 
+            </FormField>
+            <FormField label="Tipo">
+              <Select
                 value={newAccount.type}
                 onChange={e => setNewAccount(prev => ({ ...prev, type: e.target.value as AccountType }))}
-                className="bg-background border border-border p-2 text-sm rounded-sm focus:ring-1 focus:ring-primary-green outline-none"
               >
                 <option value="space">ESPACIO</option>
                 <option value="entity">ENTIDAD</option>
-              </select>
-            </div>
+              </Select>
+            </FormField>
           </div>
           <div className="flex justify-end gap-3">
-            <button onClick={() => setIsAdding(false)} className="px-6 py-2 text-xs font-bold uppercase tracking-widest text-text-secondary hover:text-text-primary transition-all">Cancelar</button>
-            <button onClick={handleAddAccount} className="bg-primary-green text-background px-6 py-2 text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-primary-green/90 transition-all">Crear Cuenta</button>
+            <Button variant="ghost" onClick={() => setIsAdding(false)}>Cancelar</Button>
+            <Button onClick={handleAddAccount}>Crear Cuenta</Button>
           </div>
-        </div>
+        </Card>
       )}
 
-      <div className="flex items-center gap-4 bg-surface border border-border p-4 rounded-sm">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
-          <input 
-            type="text" 
-            placeholder="Buscar por nombre o código..." 
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="w-full bg-background border border-border pl-10 pr-4 py-2 text-sm rounded-sm focus:ring-1 focus:ring-primary-green outline-none"
-          />
-        </div>
-      </div>
+      <Card className="flex items-center gap-4 p-4">
+        <SearchField
+          className="flex-1"
+          placeholder="Buscar por nombre o código..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+        />
+      </Card>
 
-      <div className="bg-surface border border-border rounded-sm overflow-hidden">
+      <Card className="overflow-hidden">
         <table className="w-full text-left">
           <thead>
             <tr className="bg-surface-elevated/50 border-b border-border">
@@ -154,8 +138,8 @@ export function ChartOfAccounts({ accounts, journalEntries, onAddAccount, onDele
                   <td className="p-4 text-right">
                     {!a.isSystem && (
                       <div className="flex items-center justify-end gap-2">
-                        <button className="p-1.5 text-text-secondary hover:text-text-primary transition-all"><Edit2 className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => onDeleteAccount(a.id)} className="p-1.5 text-text-secondary hover:text-primary-orange transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <IconButton hover="default" aria-label="Editar cuenta"><Edit2 className="w-3.5 h-3.5" /></IconButton>
+                        <IconButton onClick={() => onDeleteAccount(a.id)} aria-label="Eliminar cuenta"><Trash2 className="w-3.5 h-3.5" /></IconButton>
                       </div>
                     )}
                   </td>
@@ -171,7 +155,7 @@ export function ChartOfAccounts({ accounts, journalEntries, onAddAccount, onDele
             )}
           </tbody>
         </table>
-      </div>
+      </Card>
     </div>
   );
 }
