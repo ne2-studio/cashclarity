@@ -58,15 +58,12 @@ jobs:
       - name: Build image
         run: docker build -t $IMAGE_NAME:latest frontend
 
-      - name: Package acceptance API image
-        run: docker build -f backend/CashClarity.Api.Lite/Dockerfile -t cashclarity-api-lite:ci backend
-
-      - name: Verify packaged frontend
+      - name: Verify frontend acceptance
         env:
-          FRONTEND_IMAGE: ${{ env.IMAGE_NAME }}:latest
+          FRONTEND_IMAGE: cashclarity-frontend:ci-acceptance
           API_LITE_IMAGE: cashclarity-api-lite:ci
           KEEP_VERIFY_IMAGES: "1"
-        run: ./scripts/verify --skip-image-build frontend-acceptance
+        run: ./scripts/verify frontend-acceptance
 
       - name: Push image
         run: docker push $IMAGE_NAME:latest
