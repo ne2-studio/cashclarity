@@ -78,7 +78,6 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    environment: backend-production
     permissions:
       contents: read
 
