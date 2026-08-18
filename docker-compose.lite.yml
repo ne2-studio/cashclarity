@@ -1,12 +1,41 @@
 services:
+  fake-oidc:
+    image: ghcr.io/ne2-studio/fake-oidc:latest
+    environment:
+      OIDC_ISSUER: "http://localhost:5000"
+      OIDC_CLIENTS: >-
+        [{"clientId":"cashclarity-app","redirectUris":["http://localhost:3000/callback","http://localhost:5173/callback"],"postLogoutRedirectUris":["http://localhost:3000","http://localhost:5173"]}]
+      OIDC_USERS: >-
+        [{"key":"acceptance","sub":"acceptance-user","email":"acceptance@test.local","name":"Acceptance User","roles":["user"]}]
+      OIDC_DEFAULT_USER: "acceptance"
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5000"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
   api-lite:
     image: ${API_LITE_IMAGE:-cashclarity-api-lite:local}
     ports:
       - "5051:8080"
+    depends_on:
+      fake-oidc:
+        condition: service_healthy
 
   frontend:
     image: ${FRONTEND_IMAGE:-cashclarity-frontend:local}
+    environment:
+      VITE_API_URL: "http://localhost:5051/server"
+      VITE_OIDC_AUTHORITY: "http://localhost:5000"
+      VITE_OIDC_CLIENT_ID: "cashclarity-app"
+      VITE_OIDC_CALLBACK_URI: "http://localhost:3000/callback"
+      VITE_OIDC_LOGOUT_REDIRECT_URI: "http://localhost:3000"
     ports:
       - "3000:80"
     depends_on:
-      - api-lite
+      api-lite:
+        condition: service_started
+      fake-oidc:
+        condition: service_healthy

@@ -1,0 +1,9 @@
+// Rendered into env-config.js by docker-entrypoint.d/95-generate-runtime-env.sh.
+window.__ENV__ = {
+  VITE_API_URL: "${VITE_API_URL}",
+  VITE_AUTH_DISABLED: "${VITE_AUTH_DISABLED}",
+  VITE_OIDC_AUTHORITY: "${VITE_OIDC_AUTHORITY}",
+  VITE_OIDC_CLIENT_ID: "${VITE_OIDC_CLIENT_ID}",
+  VITE_OIDC_CALLBACK_URI: "${VITE_OIDC_CALLBACK_URI}",
+  VITE_OIDC_LOGOUT_REDIRECT_URI: "${VITE_OIDC_LOGOUT_REDIRECT_URI}",
+};

@@ -11,9 +11,10 @@ import { ChartOfAccounts } from './components/ChartOfAccounts';
 import { JournalEntry } from './types';
 import { useAuth } from "react-oidc-context";
 import { setAccessToken } from './api';
+import { getEnv } from './runtimeConfig';
 
 export default function App() {
-  const authDisabled = import.meta.env.VITE_AUTH_DISABLED === 'true';
+  const authDisabled = getEnv('VITE_AUTH_DISABLED') === 'true';
   const auth = useAuth();
   const { accounts, journalEntries, fetchData, isLoading, error } = useFinanceStore();
 

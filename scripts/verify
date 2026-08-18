@@ -184,7 +184,7 @@ frontend_acceptance() {
   ensure_npm_deps frontend
   run docker compose -f "$ROOT_DIR/docker-compose.lite.yml" down -v --remove-orphans
   if [[ "$build_images" == "1" ]]; then
-    run_in frontend env VITE_AUTH_DISABLED=true VITE_API_URL=http://localhost:5051/server npm run build
+    run_in frontend npm run build
     docker_build_fresh "$frontend_image" "$ROOT_DIR/frontend"
     docker_build_fresh "$api_lite_image" -f "$ROOT_DIR/backend/CashClarity.Api.Lite/Dockerfile" "$ROOT_DIR/backend"
   else

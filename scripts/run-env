@@ -176,10 +176,10 @@ Frontend: http://localhost:5173
 Backend: http://localhost:5051
 Frontend source: Vite frontend/ source with hot reload
 Backend source: Docker image $API_LITE_IMAGE
-Docker components: api-lite
+Docker components: fake-oidc, api-lite
 Development components: frontend Vite dev server
 Health: ready
-Test user: fake bearer accepted by api-lite
+Test user: Acceptance User via fake-oidc
 Logs:
   all: ./scripts/run-env logs frontend-dev
   frontend: ./scripts/run-env logs frontend-dev frontend
@@ -214,10 +214,10 @@ Frontend: http://localhost:3000
 Backend: http://localhost:5051
 Frontend source: Docker image $FRONTEND_IMAGE
 Backend source: Docker image $API_LITE_IMAGE
-Docker components: frontend, api-lite
+Docker components: fake-oidc, frontend, api-lite
 Development components: none
 Health: ready
-Test user: fake bearer accepted by api-lite
+Test user: Acceptance User via fake-oidc
 Logs:
   all: ./scripts/run-env logs full-stack
   frontend: ./scripts/run-env logs full-stack frontend
@@ -233,13 +233,15 @@ frontend_dev() {
   ensure_dirs
   reconcile_frontend_dev
 
+  require_port_free_unless_owned 5000 "fake-oidc" cashclarity-fake-oidc-1
   require_port_free_unless_owned 5051 "api-lite" cashclarity-api-lite-1
   if ! pid_alive "$VITE_PID"; then
     require_port_free 5173 "Vite frontend"
   fi
 
   build_api_lite
-  API_LITE_IMAGE="$API_LITE_IMAGE" docker compose -f "$ROOT_DIR/docker-compose.lite.yml" up -d api-lite
+  API_LITE_IMAGE="$API_LITE_IMAGE" docker compose -f "$ROOT_DIR/docker-compose.lite.yml" up -d fake-oidc api-lite
+  wait_http "http://localhost:5000/.well-known/openid-configuration" 120 "fake-oidc"
   wait_http "http://localhost:5051/server/health" 120 "api-lite"
 
   ensure_npm_deps frontend
@@ -247,8 +249,11 @@ frontend_dev() {
     (
       cd "$ROOT_DIR/frontend"
       nohup env \
-        VITE_AUTH_DISABLED="true" \
         VITE_API_URL="http://localhost:5051/server" \
+        VITE_OIDC_AUTHORITY="http://localhost:5000" \
+        VITE_OIDC_CLIENT_ID="cashclarity-app" \
+        VITE_OIDC_CALLBACK_URI="http://localhost:5173/callback" \
+        VITE_OIDC_LOGOUT_REDIRECT_URI="http://localhost:5173" \
         npx vite --port=5173 --host=0.0.0.0 >"$VITE_LOG" 2>&1 &
       echo $! >"$VITE_PID"
     )
@@ -306,14 +311,16 @@ full_stack() {
   reconcile_full_stack
 
   require_port_free_unless_owned 3000 "Docker frontend" cashclarity-frontend-1
+  require_port_free_unless_owned 5000 "fake-oidc" cashclarity-fake-oidc-1
   require_port_free_unless_owned 5051 "api-lite" cashclarity-api-lite-1
 
   build_api_lite
   ensure_npm_deps frontend
-  (cd "$ROOT_DIR/frontend" && VITE_AUTH_DISABLED=true VITE_API_URL=http://localhost:5051/server npm run build)
+  (cd "$ROOT_DIR/frontend" && npm run build)
   docker build -t "$FRONTEND_IMAGE" "$ROOT_DIR/frontend"
   FRONTEND_IMAGE="$FRONTEND_IMAGE" API_LITE_IMAGE="$API_LITE_IMAGE" docker compose -f "$ROOT_DIR/docker-compose.lite.yml" up -d api-lite frontend
 
+  wait_http "http://localhost:5000/.well-known/openid-configuration" 120 "fake-oidc"
   wait_http "http://localhost:5051/server/health" 120 "api-lite"
   wait_http "http://localhost:3000" 120 "frontend"
   print_full_stack

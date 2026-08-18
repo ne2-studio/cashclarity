@@ -1,6 +1,7 @@
 import { Account, JournalEntry, BankMovement } from './types';
+import { getEnv } from './runtimeConfig';
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:54321/functions/v1/server').replace(/\/$/, '');
+const API_BASE_URL = (getEnv('VITE_API_URL') || 'http://127.0.0.1:54321/functions/v1/server').replace(/\/$/, '');
 
 let _accessToken: string | undefined;
 

@@ -13,9 +13,9 @@ Modes:
 
 | Mode | Frontend | Backend | Purpose |
 |---|---|---|---|
-| `frontend-dev` | `http://localhost:5173` | `http://localhost:5051` | Vite frontend against `api-lite` |
+| `frontend-dev` | `http://localhost:5173` | `http://localhost:5051` | Vite frontend against `api-lite` + `fake-oidc` |
 | `backend-dev` | none | `http://localhost:5050` | Local real API against Docker Postgres |
-| `full-stack` | `http://localhost:3000` | `http://localhost:5051` | Packaged frontend against `api-lite` |
+| `full-stack` | `http://localhost:3000` | `http://localhost:5051` | Packaged frontend against `api-lite` + `fake-oidc` |
 
 Logs:
 
