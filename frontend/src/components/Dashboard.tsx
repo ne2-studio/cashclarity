@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { 
   PiggyBank, 
   Wallet,
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 
 import { Account } from '../types';
+import { useDashboardViewModel } from '../hooks/accountViews';
 
 interface DashboardProps {
   accounts: Account[];
@@ -19,15 +20,7 @@ interface DashboardProps {
 
 export function Dashboard({ accounts, metrics }: DashboardProps) {
   const { realBankBalance, totalCommitted, availableCash, bucketBalances } = metrics;
-  
-  const displayAccounts = useMemo(() => {
-    return accounts.filter((a: Account) => a.type === 'main' || a.type === 'space')
-      .sort((a: Account, b: Account) => {
-        if (a.type === 'main') return -1;
-        if (b.type === 'main') return 1;
-        return a.code.localeCompare(b.code);
-      });
-  }, [accounts]);
+  const { displayAccounts } = useDashboardViewModel(accounts);
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(val);

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { Account, BankMovement, JournalLine, JournalEntry } from '../types';
+import { Account, BankMovement, JournalEntry } from '../types';
+import { payEntryFromSpaceLines } from '../hooks/journalEntryLogic';
 
 interface PayFromSpaceModalProps {
   movement: BankMovement;
@@ -36,12 +37,7 @@ export function PayFromSpaceModal({
     const entry = await getOrCreateEntry(movement);
     if (!entry) return;
 
-    const newLines = entry.lines.map((l: JournalLine) => {
-      if (l.accountId === mainAccount.id) {
-        return new JournalLine({ ...l, accountId: selectedSpaceId });
-      }
-      return new JournalLine({ ...l });
-    });
+    const newLines = payEntryFromSpaceLines(entry.lines, mainAccount.id, selectedSpaceId);
 
     await onUpdateJournalEntry(entry.id, { lines: newLines });
     onClose();

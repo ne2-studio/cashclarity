@@ -2,6 +2,7 @@ import React, { useState, ChangeEvent } from 'react';
 import { Upload, X, CheckCircle2, AlertCircle } from 'lucide-react';
 
 import { BankMovement } from '../types';
+import { parseBankMovementsCsv } from '../hooks/csvImport';
 
 interface ImportCSVProps {
   onClose: () => void;
@@ -21,46 +22,18 @@ export function ImportCSV({ onClose, onAddBankMovement }: ImportCSVProps) {
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      // Handle both \n and \r\n line endings
-      const lines = text.split(/\r?\n/);
-      if (lines.length < 2) {
-        alert('El archivo está vacío o no tiene suficientes líneas.');
+      const result = parseBankMovementsCsv(text);
+      if ('movements' in result) {
+        setImportPreview(result.movements);
         return;
       }
 
-      // Clean headers: remove quotes, spaces and convert to lowercase
-      const headers = lines[0].toLowerCase().split(';').map(h => h.replace(/["']/g, '').trim());
-      
-      const dateIdx = headers.indexOf('fecha');
-      const descIdx = headers.indexOf('concepto');
-      const amountIdx = headers.indexOf('cantidad');
-
-      if (dateIdx === -1 || descIdx === -1 || amountIdx === -1) {
-        console.log('Headers detectados:', headers);
-        alert('Formato de CSV inválido. Debe contener las columnas: fecha; Concepto; cantidad\n\nHeaders encontrados: ' + headers.join(', '));
-        return;
+      if (result.headers) {
+        console.log('Headers detectados:', result.headers);
+        alert(`${result.error}\n\nHeaders encontrados: ${result.headers.join(', ')}`);
+      } else {
+        alert(result.error);
       }
-
-      const parsed = lines.slice(1)
-        .filter(line => line.trim() !== '')
-        .map(line => {
-          const parts = line.split(';');
-          // Clean each part from quotes and spaces
-          const cleanParts = parts.map(p => p.replace(/["']/g, '').trim());
-          
-          return {
-            date: cleanParts[dateIdx] || '',
-            description: cleanParts[descIdx] || '',
-            amount: parseFloat(cleanParts[amountIdx]?.replace(',', '.') || '0')
-          };
-        })
-        .filter(m => m.date && m.description);
-
-      if (parsed.length === 0) {
-        alert('No se han podido extraer movimientos válidos del archivo. Revisa el formato.');
-      }
-
-      setImportPreview(parsed);
     };
     reader.readAsText(file);
   };

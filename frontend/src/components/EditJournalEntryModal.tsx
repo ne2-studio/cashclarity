@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Account, BankMovement, JournalLine } from '../types';
+import { getJournalTotals } from '../hooks/journalEntryLogic';
 
 interface EditJournalEntryModalProps {
   movement: BankMovement;
@@ -33,8 +34,7 @@ export function EditJournalEntryModal({
   setEntry,
   formatCurrency
 }: EditJournalEntryModalProps) {
-  const totalDebit = entry.lines.reduce((sum, l) => sum + l.debit, 0);
-  const totalCredit = entry.lines.reduce((sum, l) => sum + l.credit, 0);
+  const { debit: totalDebit, credit: totalCredit } = getJournalTotals(entry.lines);
   const isUnbalanced = Math.abs(totalDebit - totalCredit) > 0.01;
 
   return (

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { Account, BankMovement, JournalEntry, JournalLine } from '../types';
+import { Account, BankMovement, JournalEntry } from '../types';
+import { appendReservationLines, validateReservations } from '../hooks/journalEntryLogic';
 
 interface ReserveModalProps {
   movement: BankMovement;
@@ -27,42 +28,16 @@ export function ReserveModal({
   const handleReserve = async () => {
     if (reservations.length === 0) return;
     
-    if (!mainAccount) {
-      alert('No se ha encontrado la cuenta principal');
-      return;
-    }
-
-    const totalReserved = reservations.reduce((sum, r) => sum + r.amount, 0);
-    if (totalReserved > movement.amount) {
-      alert('La cantidad total reservada no puede superar el importe del movimiento');
-      return;
-    }
-
-    if (reservations.some(r => !r.spaceId || r.amount <= 0)) {
-      alert('Todas las reservas deben tener un espacio seleccionado y una cantidad mayor que cero');
+    const validationError = validateReservations(reservations, movement.amount, Boolean(mainAccount));
+    if (validationError) {
+      alert(validationError);
       return;
     }
 
     const entry = await getOrCreateEntry(movement);
     if (!entry) return;
 
-    const newLines = entry.lines.map(l => new JournalLine({ ...l }));
-
-    reservations.forEach(res => {
-      // Debit Space, Credit Main
-      newLines.push(new JournalLine({
-        id: crypto.randomUUID(),
-        accountId: res.spaceId,
-        debit: res.amount,
-        credit: 0
-      }));
-      newLines.push(new JournalLine({
-        id: crypto.randomUUID(),
-        accountId: mainAccount.id,
-        debit: 0,
-        credit: res.amount
-      }));
-    });
+    const newLines = appendReservationLines(entry.lines, reservations, mainAccount!.id);
 
     await onUpdateJournalEntry(entry.id, { lines: newLines });
     onClose();

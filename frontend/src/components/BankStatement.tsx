@@ -20,6 +20,11 @@ import {
   Wallet
 } from 'lucide-react';
 import { Account, BankMovement, JournalEntry, JournalLine } from '../types';
+import {
+  createEntryFromMovement,
+  toEditableJournalEntry,
+  validateJournalEntry,
+} from '../hooks/journalEntryLogic';
 
 interface BankStatementProps {
   accounts: Account[];
@@ -108,27 +113,7 @@ export function BankStatement({
       return undefined;
     }
 
-    const isIncome = movement.amount > 0;
-    const absAmount = Math.abs(movement.amount);
-
-    const entry = await onAddJournalEntry({
-      description: movement.description,
-      date: movement.date,
-      lines: [
-        new JournalLine({ 
-          id: crypto.randomUUID(),
-          accountId: mainAccount.id,
-          debit: isIncome ? absAmount : 0, 
-          credit: isIncome ? 0 : absAmount 
-        }),
-        new JournalLine({ 
-          id: crypto.randomUUID(),
-          accountId: uncategorizedAccount.id,
-          debit: isIncome ? 0 : absAmount, 
-          credit: isIncome ? absAmount : 0 
-        })
-      ]
-    });
+    const entry = await onAddJournalEntry(createEntryFromMovement(movement, mainAccount.id, uncategorizedAccount.id));
 
     await onUpdateBankMovement(movement.id, { journalEntryId: entry.id });
     return entry;
@@ -140,11 +125,7 @@ export function BankStatement({
     const entry = await getOrCreateEntry(movement);
     if (!entry) return;
 
-    setEditingEntry({
-      description: entry.description,
-      date: entry.date,
-      lines: entry.lines.map((l: JournalLine) => ({ ...l }))
-    });
+    setEditingEntry(toEditableJournalEntry(entry));
   };
 
   const handleSaveEntry = async (updatedEntry: {
@@ -154,16 +135,9 @@ export function BankStatement({
   }) => {
     if (!editingMovement) return;
 
-    if (updatedEntry.lines.some(l => !l.accountId)) {
-      alert('Todas las líneas deben tener una cuenta seleccionada');
-      return;
-    }
-
-    const totalDebit = updatedEntry.lines.reduce((sum, l) => sum + l.debit, 0);
-    const totalCredit = updatedEntry.lines.reduce((sum, l) => sum + l.credit, 0);
-
-    if (Math.abs(totalDebit - totalCredit) > 0.01) {
-      alert('El asiento no está cuadrado');
+    const validationError = validateJournalEntry(updatedEntry);
+    if (validationError) {
+      alert(validationError);
       return;
     }
 

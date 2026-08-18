@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { 
   Search, 
   History
 } from 'lucide-react';
-import { JournalEntry, JournalLine, Account } from '../types';
+import { JournalEntry, Account } from '../types';
+import { useJournalLines } from '../hooks/ledgerViews';
 
 interface JournalProps {
   journalEntries: JournalEntry[];
@@ -16,26 +17,7 @@ export function Journal({ journalEntries, accounts }: JournalProps) {
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(val);
 
-  const flattenedLines = useMemo(() => {
-    const lines: (JournalLine & { entryId: string; date: string; description: string })[] = [];
-    journalEntries.forEach((entry: JournalEntry) => {
-      entry.lines.forEach((line: JournalLine) => {
-        lines.push({
-          ...line,
-          entryId: entry.id,
-          date: entry.date,
-          description: entry.description
-        });
-      });
-    });
-    
-    const search = searchTerm.toLowerCase();
-    return lines.filter(l => 
-      l.description.toLowerCase().includes(search) || 
-      accounts.find((a: Account) => a.id === l.accountId)?.name.toLowerCase().includes(search) ||
-      accounts.find((a: Account) => a.id === l.accountId)?.code.includes(search)
-    ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [journalEntries, accounts, searchTerm]);
+  const flattenedLines = useJournalLines(journalEntries, accounts, searchTerm);
 
   return (
     <div className="flex flex-col gap-8">

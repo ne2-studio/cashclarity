@@ -7,7 +7,9 @@ import {
   MoreHorizontal,
   History,
 } from 'lucide-react';
-import { Account, JournalEntry, JournalLine } from '../types';
+import { Account, JournalEntry } from '../types';
+import { getAccountSummary, useEntityLedger } from '../hooks/ledgerViews';
+import { getEntityAccounts, isValidAccountCode } from '../hooks/accountViews';
 
 interface EntitiesProps {
   accounts: Account[];
@@ -16,15 +18,16 @@ interface EntitiesProps {
 }
 
 export function Entities({ accounts, journalEntries, onAddAccount }: EntitiesProps) {
-  const entities = useMemo(() => accounts.filter((a: Account) => a.type === 'entity'), [accounts]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEntity, setSelectedEntity] = useState<Account | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [newEntity, setNewEntity] = useState({ name: '', code: '' });
 
+  const selectedEntityStats = useEntityLedger(journalEntries, selectedEntity);
+
   const handleAddEntity = () => {
     if (!newEntity.name || !newEntity.code) return;
-    if (!/^\d{4}$/.test(newEntity.code)) {
+    if (!isValidAccountCode(newEntity.code)) {
       alert('El código debe ser numérico de 4 dígitos');
       return;
     }
@@ -38,58 +41,14 @@ export function Entities({ accounts, journalEntries, onAddAccount }: EntitiesPro
 
   const filteredEntities = useMemo(() => {
     const search = (searchTerm || '').toLowerCase();
-    return entities.filter((e: Account) => {
+    return getEntityAccounts(accounts).filter((e: Account) => {
       const name = (e.name || '').toLowerCase();
       return name.includes(search) || e.code.includes(search);
     }).sort((a, b) => a.code.localeCompare(b.code));
-  }, [entities, searchTerm]);
-
-  const selectedEntityStats = useMemo(() => {
-    if (!selectedEntity) return null;
-    const lines: (JournalLine & { 
-      entryId: string; 
-      date: string; 
-      description: string; 
-      displayAmount: number; 
-    })[] = [];
-    journalEntries.forEach((entry: JournalEntry) => {
-      entry.lines.forEach((line: JournalLine) => {
-        if (line.accountId === selectedEntity.id) {
-          lines.push({
-            ...line,
-            entryId: entry.id,
-            date: entry.date,
-            description: entry.description,
-            displayAmount: line.debit - line.credit
-          });
-        }
-      });
-    });
-    
-    const totalIn = lines.filter(l => l.displayAmount > 0).reduce((sum, l) => sum + l.displayAmount, 0);
-    const totalOut = lines.filter(l => l.displayAmount < 0).reduce((sum, l) => sum + Math.abs(l.displayAmount), 0);
-    
-    return { 
-      count: lines.length, 
-      totalIn, 
-      totalOut, 
-      net: totalIn - totalOut,
-      transactions: lines.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    };
-  }, [selectedEntity, journalEntries]);
+  }, [accounts, searchTerm]);
 
   const getEntitySummary = (id: string) => {
-    let count = 0;
-    let net = 0;
-    journalEntries.forEach((entry: JournalEntry) => {
-      entry.lines.forEach((line: JournalLine) => {
-        if (line.accountId === id) {
-          count++;
-          net += (line.debit - line.credit);
-        }
-      });
-    });
-    return { count, net };
+    return getAccountSummary(journalEntries, id);
   };
 
   return (

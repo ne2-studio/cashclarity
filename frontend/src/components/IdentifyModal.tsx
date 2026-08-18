@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { Account, BankMovement, JournalLine, JournalEntry } from '../types';
+import { Account, BankMovement, JournalEntry } from '../types';
+import { identifyEntryLines } from '../hooks/journalEntryLogic';
 
 interface IdentifyModalProps {
   movement: BankMovement;
@@ -33,12 +34,7 @@ export function IdentifyModal({
     const entry = await getOrCreateEntry(movement);
     if (!entry) return;
 
-    const newLines = entry.lines.map((l: JournalLine) => {
-      if (l.accountId === uncategorizedAccount?.id) {
-        return new JournalLine({ ...l, accountId: selectedEntityId });
-      }
-      return new JournalLine({ ...l });
-    });
+    const newLines = identifyEntryLines(entry.lines, uncategorizedAccount?.id, selectedEntityId);
 
     await onUpdateJournalEntry(entry.id, { lines: newLines });
     await onUpdateBankMovement(movement.id, { 

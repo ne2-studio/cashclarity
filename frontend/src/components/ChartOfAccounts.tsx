@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { 
   Zap, 
   Plus, 
@@ -7,7 +7,8 @@ import {
   Edit2,
   AlertCircle
 } from 'lucide-react';
-import { Account, AccountType, JournalEntry, JournalLine } from '../types';
+import { Account, AccountType, JournalEntry } from '../types';
+import { isValidAccountCode, useChartOfAccountsViewModel } from '../hooks/accountViews';
 
 interface ChartOfAccountsProps {
   accounts: Account[];
@@ -20,32 +21,12 @@ export function ChartOfAccounts({ accounts, journalEntries, onAddAccount, onDele
   const [isAdding, setIsAdding] = useState(false);
   const [newAccount, setNewAccount] = useState({ code: '', name: '', type: 'space' as AccountType });
   const [searchTerm, setSearchTerm] = useState('');
-
-  const accountStats = useMemo(() => {
-    const stats: Record<string, { debit: number, credit: number }> = {};
-    accounts.forEach((a: Account) => stats[a.id] = { debit: 0, credit: 0 });
-
-    journalEntries.forEach((entry: JournalEntry) => {
-      entry.lines.forEach((line: JournalLine) => {
-        if (stats[line.accountId]) {
-          stats[line.accountId].debit += line.debit;
-          stats[line.accountId].credit += line.credit;
-        }
-      });
-    });
-
-    return stats;
-  }, [accounts, journalEntries]);
-
-  const filteredAccounts = accounts.filter((a: Account) => {
-    const search = searchTerm.toLowerCase();
-    return a.name.toLowerCase().includes(search) || a.code.includes(search);
-  }).sort((a: Account, b: Account) => a.code.localeCompare(b.code));
+  const { accountStats, filteredAccounts } = useChartOfAccountsViewModel(accounts, journalEntries, searchTerm);
 
   const handleAddAccount = () => {
     if (!newAccount.code || !newAccount.name) return;
     // Validate 4-digit numeric code
-    if (!/^\d{4}$/.test(newAccount.code)) {
+    if (!isValidAccountCode(newAccount.code)) {
       alert('El código debe ser numérico de 4 dígitos (ej: 5721)');
       return;
     }

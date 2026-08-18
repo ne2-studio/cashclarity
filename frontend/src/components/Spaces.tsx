@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { 
   Plus, 
   PiggyBank, 
@@ -8,7 +8,9 @@ import {
   Trash2,
   ShieldCheck
 } from 'lucide-react';
-import { Account, JournalEntry, JournalLine } from '../types';
+import { Account, JournalEntry } from '../types';
+import { isValidAccountCode, useSpaceAccounts } from '../hooks/accountViews';
+import { useSpaceLedger } from '../hooks/ledgerViews';
 
 interface SpacesProps {
   accounts: Account[];
@@ -19,50 +21,18 @@ interface SpacesProps {
 }
 
 export function Spaces({ accounts, journalEntries, bucketBalances, onAddAccount, onDeleteAccount }: SpacesProps) {
-  const buckets = useMemo(() => accounts.filter((a: Account) => a.type === 'space' || a.type === 'main'), [accounts]);
-  
   const [selectedBucket, setSelectedBucket] = useState<Account | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [newBucket, setNewBucket] = useState({ name: '', code: '' });
+  const sortedBuckets = useSpaceAccounts(accounts);
+  const bucketTransactions = useSpaceLedger(journalEntries, selectedBucket);
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(val);
 
-  const bucketTransactions = useMemo(() => {
-    if (!selectedBucket) return [];
-    const lines: (JournalLine & { 
-      entryId: string; 
-      date: string; 
-      description: string; 
-      displayAmount: number; 
-    })[] = [];
-    journalEntries.forEach((entry: JournalEntry) => {
-      entry.lines.forEach((line: JournalLine) => {
-        if (line.accountId === selectedBucket.id) {
-          lines.push({
-            ...line,
-            entryId: entry.id,
-            date: entry.date,
-            description: entry.description,
-            displayAmount: line.debit - line.credit
-          });
-        }
-      });
-    });
-    return lines.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [selectedBucket, journalEntries]);
-
-  const sortedBuckets = useMemo(() => {
-    return [...buckets].sort((a, b) => {
-      if (a.type === 'main') return -1;
-      if (b.type === 'main') return 1;
-      return a.code.localeCompare(b.code);
-    });
-  }, [buckets]);
-
   const handleAddBucket = () => {
     if (!newBucket.name || !newBucket.code) return;
-    if (!/^\d{4}$/.test(newBucket.code)) {
+    if (!isValidAccountCode(newBucket.code)) {
       alert('El código debe ser numérico de 4 dígitos');
       return;
     }
