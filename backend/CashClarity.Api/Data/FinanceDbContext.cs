@@ -70,7 +70,7 @@ public class FinanceDbContext(DbContextOptions<FinanceDbContext> options) : DbCo
             e.HasOne<JournalEntry>().WithMany(je => je.Lines)
                 .HasForeignKey(jl => jl.JournalEntryId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<Account>().WithMany()
-                .HasForeignKey(jl => jl.AccountId).OnDelete(DeleteBehavior.Cascade);
+                .HasForeignKey(jl => jl.AccountId).OnDelete(DeleteBehavior.Restrict);
 
             e.HasIndex(jl => jl.JournalEntryId).HasDatabaseName("idx_journal_lines_journal_entry_id");
             e.HasIndex(jl => jl.AccountId).HasDatabaseName("idx_journal_lines_account_id");

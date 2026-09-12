@@ -64,9 +64,15 @@ public class AccountsRepository(FinanceDbContext db) : IAccountsRepository
 
     public async Task DeleteAccount(string id, string userId)
     {
-        await db.Accounts
-            .Where(a => a.Id == id && a.UserId == userId)
-            .ExecuteDeleteAsync();
+        var account = await db.Accounts
+            .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
+        if (account is null) return;
+
+        var hasReferencingJournalLines = await db.JournalLines.AnyAsync(l => l.AccountId == id);
+        AccountDeletionPolicy.EnsureDeletable(id, hasReferencingJournalLines);
+
+        db.Accounts.Remove(account);
+        await db.SaveChangesAsync();
     }
 
     private async Task EnsureSystemAccounts(string userId)

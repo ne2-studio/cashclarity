@@ -20,6 +20,7 @@ public class JournalEntriesController(IJournalEntriesRepository repo) : BaseCont
     public async Task<IActionResult> AddJournalEntry([FromBody] JournalEntryCreateRequest body)
     {
         try { return Ok(await repo.AddJournalEntry(body, UserId)); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
         catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
     }
 
@@ -27,6 +28,7 @@ public class JournalEntriesController(IJournalEntriesRepository repo) : BaseCont
     public async Task<IActionResult> UpdateJournalEntry(string id, [FromBody] JournalEntryPatchRequest body)
     {
         try { await repo.UpdateJournalEntry(id, body, UserId); return Ok(new { success = true }); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
         catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
     }
 

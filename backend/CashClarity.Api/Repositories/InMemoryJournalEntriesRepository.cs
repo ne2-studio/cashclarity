@@ -1,4 +1,5 @@
 using CashClarity.Api.Controllers;
+using CashClarity.Api.Domain;
 
 namespace CashClarity.Api.Repositories;
 
@@ -34,6 +35,8 @@ public class InMemoryJournalEntriesRepository : IJournalEntriesRepository
 
     public Task<JournalEntryResponse> AddJournalEntry(JournalEntryCreateRequest req, string userId)
     {
+        JournalEntryPolicy.EnsureBalanced(req.Lines.Select(l => (l.Debit, l.Credit)));
+
         lock (gate)
         {
             var entry = new JournalEntryResponse(
@@ -54,6 +57,11 @@ public class InMemoryJournalEntriesRepository : IJournalEntriesRepository
 
     public Task UpdateJournalEntry(string id, JournalEntryPatchRequest patch, string userId)
     {
+        if (patch.Lines is not null)
+        {
+            JournalEntryPolicy.EnsureBalanced(patch.Lines.Select(l => (l.Debit, l.Credit)));
+        }
+
         lock (gate)
         {
             var index = journalEntries.FindIndex(e => e.Id == id && e.UserId == userId);

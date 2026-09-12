@@ -28,6 +28,8 @@ public class JournalEntriesRepository(FinanceDbContext db) : IJournalEntriesRepo
 
     public async Task<JournalEntryResponse> AddJournalEntry(JournalEntryCreateRequest req, string userId)
     {
+        JournalEntryPolicy.EnsureBalanced(req.Lines.Select(l => (l.Debit, l.Credit)));
+
         var entry = new JournalEntry
         {
             Date = ParseDate(req.Date),
@@ -59,6 +61,8 @@ public class JournalEntriesRepository(FinanceDbContext db) : IJournalEntriesRepo
 
         if (patch.Lines is not null)
         {
+            JournalEntryPolicy.EnsureBalanced(patch.Lines.Select(l => (l.Debit, l.Credit)));
+
             entry.Lines.Clear();
             foreach (var l in patch.Lines)
             {

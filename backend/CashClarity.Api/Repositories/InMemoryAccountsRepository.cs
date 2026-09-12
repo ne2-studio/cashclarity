@@ -1,4 +1,5 @@
 using CashClarity.Api.Controllers;
+using CashClarity.Api.Domain;
 
 namespace CashClarity.Api.Repositories;
 
@@ -86,8 +87,14 @@ public class InMemoryAccountsRepository : IAccountsRepository
     {
         lock (gate)
         {
-            accounts.RemoveAll(a => a.Id == id && a.UserId == userId);
-            journalEntries.RemoveAll(e => e.UserId == userId && e.Lines.Any(l => l.AccountId == id));
+            var account = accounts.FirstOrDefault(a => a.Id == id && a.UserId == userId);
+            if (account is null) return Task.CompletedTask;
+
+            var hasReferencingJournalLines = journalEntries
+                .Any(e => e.UserId == userId && e.Lines.Any(l => l.AccountId == id));
+            AccountDeletionPolicy.EnsureDeletable(id, hasReferencingJournalLines);
+
+            accounts.Remove(account);
             for (var i = 0; i < bankMovements.Count; i++)
             {
                 if (bankMovements[i].UserId == userId && bankMovements[i].EntityId == id)
