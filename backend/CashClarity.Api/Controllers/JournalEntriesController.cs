@@ -13,30 +13,26 @@ public class JournalEntriesController(IJournalEntriesRepository repo) : BaseCont
     [HttpGet]
     public async Task<IActionResult> GetJournalEntries()
     {
-        try { return Ok(await repo.GetJournalEntries(UserId)); }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        return Ok(await repo.GetJournalEntries(UserId));
     }
 
     [HttpPost]
     public async Task<IActionResult> AddJournalEntry([FromBody] JournalEntryCreateRequest body)
     {
-        try { return Ok(await repo.AddJournalEntry(body, UserId)); }
-        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        return Ok(await repo.AddJournalEntry(body, UserId));
     }
 
     [HttpPatch("{id}")]
     public async Task<IActionResult> UpdateJournalEntry(string id, [FromBody] JournalEntryPatchRequest body)
     {
-        try { await repo.UpdateJournalEntry(id, body, UserId); return Ok(new { success = true }); }
-        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        await repo.UpdateJournalEntry(id, body, UserId);
+        return Ok(new { success = true });
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteJournalEntry(string id)
     {
-        try { await repo.DeleteJournalEntry(id, UserId); return Ok(new { success = true }); }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        await repo.DeleteJournalEntry(id, UserId);
+        return Ok(new { success = true });
     }
 }
