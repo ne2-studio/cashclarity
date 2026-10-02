@@ -1,4 +1,5 @@
 using CashClarity.Api.Controllers;
+using CashClarity.Api.Contracts;
 using CashClarity.Api.Lite;
 using CashClarity.Api.Repositories;
 using CashClarity.Api.Services;
