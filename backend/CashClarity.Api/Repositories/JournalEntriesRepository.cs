@@ -54,7 +54,7 @@ public class JournalEntriesRepository(FinanceDbContext db) : IJournalEntriesRepo
         var entry = await db.JournalEntries
             .Include(je => je.Lines)
             .FirstOrDefaultAsync(je => je.Id == entryId && je.UserId == userId)
-            ?? throw new Exception("Journal entry not found or access denied");
+            ?? throw new NotFoundException("Journal entry not found or access denied");
 
         if (patch.Date is not null) entry.Date = ParseDate(patch.Date);
         if (patch.Description is not null) entry.Description = patch.Description;

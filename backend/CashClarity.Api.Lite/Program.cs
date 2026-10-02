@@ -33,6 +33,8 @@ builder.Services.AddSingleton<IBankMovementsRepository>(services =>
     new InMemoryBankMovementsRepository(services.GetRequiredService<List<BankMovementResponse>>()));
 builder.Services.AddSingleton<IBankMovementImportService, BankMovementImportService>();
 builder.Services.AddControllers().AddApplicationPart(typeof(AccountsController).Assembly);
+builder.Services.AddExceptionHandler<CashClarity.Api.ApiExceptionHandler>();
+builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 
 builder.Services
@@ -51,6 +53,7 @@ builder.Host.UseSerilog((context, services, loggerConfiguration) =>
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();

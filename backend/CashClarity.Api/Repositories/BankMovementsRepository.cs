@@ -65,7 +65,7 @@ public class BankMovementsRepository(FinanceDbContext db) : IBankMovementsReposi
     {
         var movement = await db.BankMovements
             .FirstOrDefaultAsync(bm => bm.Id == Guid.Parse(id) && bm.UserId == userId)
-            ?? throw new Exception("Bank movement not found or access denied");
+            ?? throw new NotFoundException("Bank movement not found or access denied");
 
         if (patch.Date is not null) movement.Date = ParseDate(patch.Date);
         if (patch.Description is not null) movement.Description = patch.Description;

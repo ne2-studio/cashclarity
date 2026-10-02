@@ -14,47 +14,40 @@ public class BankMovementsController(IBankMovementsRepository repo, IBankMovemen
     [HttpGet]
     public async Task<IActionResult> GetBankMovements()
     {
-        try { return Ok(await repo.GetBankMovements(UserId)); }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        return Ok(await repo.GetBankMovements(UserId));
     }
 
     [HttpPost]
     public async Task<IActionResult> AddBankMovement([FromBody] BankMovementCreateRequest body)
     {
-        try { return Ok(await repo.AddBankMovement(body, UserId)); }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        return Ok(await repo.AddBankMovement(body, UserId));
     }
 
     [HttpPost("imports/preview")]
     public async Task<IActionResult> PreviewImport(IFormFile file)
     {
-        try
-        {
-            if (file.Length == 0) return BadRequest(new { error = "CSV file is required" });
-            await using var stream = file.OpenReadStream();
-            return Ok(await imports.Preview(stream, UserId));
-        }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        if (file.Length == 0) return BadRequest(new { error = "CSV file is required" });
+        await using var stream = file.OpenReadStream();
+        return Ok(await imports.Preview(stream, UserId));
     }
 
     [HttpPost("imports")]
     public async Task<IActionResult> CommitImport([FromBody] BankMovementImportCommitRequest body)
     {
-        try { return Ok(await imports.Commit(body, UserId)); }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        return Ok(await imports.Commit(body, UserId));
     }
 
     [HttpPatch("{id}")]
     public async Task<IActionResult> UpdateBankMovement(string id, [FromBody] BankMovementPatchRequest body)
     {
-        try { await repo.UpdateBankMovement(id, body, UserId); return Ok(new { success = true }); }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        await repo.UpdateBankMovement(id, body, UserId);
+        return Ok(new { success = true });
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteBankMovement(string id)
     {
-        try { await repo.DeleteBankMovement(id, UserId); return Ok(new { success = true }); }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        await repo.DeleteBankMovement(id, UserId);
+        return Ok(new { success = true });
     }
 }
