@@ -1,4 +1,4 @@
-using CashClarity.Api.Controllers;
+using CashClarity.Api.Contracts;
 using CashClarity.Api.Domain;
 
 namespace CashClarity.Api.Repositories;
