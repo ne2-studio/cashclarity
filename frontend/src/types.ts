@@ -90,3 +90,9 @@ export class BankMovement {
     this.journalEntryId = data.journalEntryId;
   }
 }
+
+export interface Workspace {
+  id: string;
+  name: string;
+  createdAt: string;
+}

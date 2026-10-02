@@ -8,8 +8,8 @@ namespace CashClarity.Api.Services;
 
 public interface IBankMovementImportService
 {
-    Task<BankMovementImportPreviewResponse> Preview(Stream csv, string userId);
-    Task<BankMovementImportCommitResponse> Commit(BankMovementImportCommitRequest request, string userId);
+    Task<BankMovementImportPreviewResponse> Preview(Stream csv, string userId, Guid workspaceId);
+    Task<BankMovementImportCommitResponse> Commit(BankMovementImportCommitRequest request, string userId, Guid workspaceId);
 }
 
 public class BankMovementImportService(IBankMovementsRepository bankMovements) : IBankMovementImportService
@@ -19,21 +19,21 @@ public class BankMovementImportService(IBankMovementsRepository bankMovements) :
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
     }
 
-    public async Task<BankMovementImportPreviewResponse> Preview(Stream importFile, string userId)
+    public async Task<BankMovementImportPreviewResponse> Preview(Stream importFile, string userId, Guid workspaceId)
     {
         using var memory = new MemoryStream();
         await importFile.CopyToAsync(memory);
         var parsedRows = Parse(memory.ToArray());
-        var existing = await bankMovements.GetBankMovements(userId);
+        var existing = await bankMovements.GetBankMovements(userId, workspaceId);
         var rows = MarkDuplicates(parsedRows, existing);
 
         return new BankMovementImportPreviewResponse(rows, BuildSummary(rows));
     }
 
-    public async Task<BankMovementImportCommitResponse> Commit(BankMovementImportCommitRequest request, string userId)
+    public async Task<BankMovementImportCommitResponse> Commit(BankMovementImportCommitRequest request, string userId, Guid workspaceId)
     {
         var rowsToImport = request.Rows.Where(r => r.Selected).ToList();
-        var existing = await bankMovements.GetBankMovements(userId);
+        var existing = await bankMovements.GetBankMovements(userId, workspaceId);
         var checkedRows = MarkDuplicates(rowsToImport, existing);
 
         var failed = checkedRows
@@ -51,7 +51,8 @@ public class BankMovementImportService(IBankMovementsRepository bankMovements) :
             ? []
             : await bankMovements.AddBankMovements(
                 importableRows.Select(r => new BankMovementCreateRequest(r.Date!, r.Description!, r.Amount!.Value)).ToList(),
-                userId);
+                userId,
+                workspaceId);
 
         return new BankMovementImportCommitResponse(
             created,

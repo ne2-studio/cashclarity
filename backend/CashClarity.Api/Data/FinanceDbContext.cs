@@ -5,6 +5,7 @@ namespace CashClarity.Api.Data;
 
 public class FinanceDbContext(DbContextOptions<FinanceDbContext> options) : DbContext(options)
 {
+    public DbSet<Workspace> Workspaces => Set<Workspace>();
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalLine> JournalLines => Set<JournalLine>();
@@ -12,6 +13,22 @@ public class FinanceDbContext(DbContextOptions<FinanceDbContext> options) : DbCo
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
+        mb.Entity<Workspace>(e =>
+        {
+            e.ToTable("workspaces");
+            e.Property(w => w.Id).HasColumnName("id").HasDefaultValueSql("gen_random_uuid()");
+            e.Property(w => w.Name).HasColumnName("name").HasMaxLength(WorkspaceNamePolicy.MaxLength);
+            e.Property(w => w.UserId).HasColumnName("user_id");
+            e.Property(w => w.CreatedAt).HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .HasDefaultValueSql("timezone('utc'::text, now())");
+            e.Property(w => w.UpdatedAt).HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .HasDefaultValueSql("timezone('utc'::text, now())");
+
+            e.HasIndex(w => w.UserId).HasDatabaseName("idx_workspaces_user_id");
+        });
+
         mb.Entity<Account>(e =>
         {
             e.ToTable("accounts");
@@ -22,6 +39,7 @@ public class FinanceDbContext(DbContextOptions<FinanceDbContext> options) : DbCo
             e.Property(a => a.Type).HasColumnName("type");
             e.Property(a => a.Balance).HasColumnName("balance").HasPrecision(15, 2).HasDefaultValue(0m);
             e.Property(a => a.IsSystem).HasColumnName("is_system").HasDefaultValue(false);
+            e.Property(a => a.WorkspaceId).HasColumnName("workspace_id");
             e.Property(a => a.UserId).HasColumnName("user_id");
             e.Property(a => a.CreatedAt).HasColumnName("created_at")
                 .HasColumnType("timestamp with time zone")
@@ -30,8 +48,11 @@ public class FinanceDbContext(DbContextOptions<FinanceDbContext> options) : DbCo
                 .HasColumnType("timestamp with time zone")
                 .HasDefaultValueSql("timezone('utc'::text, now())");
 
-            e.HasIndex(a => new { a.UserId, a.Code }).IsUnique()
-                .HasDatabaseName("accounts_user_id_code_key");
+            e.HasOne<Workspace>().WithMany()
+                .HasForeignKey(a => a.WorkspaceId).OnDelete(DeleteBehavior.Restrict);
+
+            e.HasIndex(a => new { a.WorkspaceId, a.Code }).IsUnique()
+                .HasDatabaseName("accounts_workspace_id_code_key");
         });
 
         mb.Entity<JournalEntry>(e =>
@@ -42,6 +63,7 @@ public class FinanceDbContext(DbContextOptions<FinanceDbContext> options) : DbCo
                 .HasColumnType("timestamp with time zone")
                 .HasDefaultValueSql("timezone('utc'::text, now())");
             e.Property(je => je.Description).HasColumnName("description");
+            e.Property(je => je.WorkspaceId).HasColumnName("workspace_id");
             e.Property(je => je.UserId).HasColumnName("user_id");
             e.Property(je => je.CreatedAt).HasColumnName("created_at")
                 .HasColumnType("timestamp with time zone")
@@ -49,6 +71,10 @@ public class FinanceDbContext(DbContextOptions<FinanceDbContext> options) : DbCo
             e.Property(je => je.UpdatedAt).HasColumnName("updated_at")
                 .HasColumnType("timestamp with time zone")
                 .HasDefaultValueSql("timezone('utc'::text, now())");
+
+            e.HasOne<Workspace>().WithMany()
+                .HasForeignKey(je => je.WorkspaceId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(je => je.WorkspaceId).HasDatabaseName("idx_journal_entries_workspace_id");
         });
 
         mb.Entity<JournalLine>(e =>
@@ -88,6 +114,7 @@ public class FinanceDbContext(DbContextOptions<FinanceDbContext> options) : DbCo
             e.Property(bm => bm.IsIdentified).HasColumnName("is_identified").HasDefaultValue(false);
             e.Property(bm => bm.EntityId).HasColumnName("entity_id").HasColumnType("text");
             e.Property(bm => bm.JournalEntryId).HasColumnName("journal_entry_id");
+            e.Property(bm => bm.WorkspaceId).HasColumnName("workspace_id");
             e.Property(bm => bm.UserId).HasColumnName("user_id");
             e.Property(bm => bm.CreatedAt).HasColumnName("created_at")
                 .HasColumnType("timestamp with time zone")
@@ -96,11 +123,14 @@ public class FinanceDbContext(DbContextOptions<FinanceDbContext> options) : DbCo
                 .HasColumnType("timestamp with time zone")
                 .HasDefaultValueSql("timezone('utc'::text, now())");
 
+            e.HasOne<Workspace>().WithMany()
+                .HasForeignKey(bm => bm.WorkspaceId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Account>().WithMany()
                 .HasForeignKey(bm => bm.EntityId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);
             e.HasOne<JournalEntry>().WithMany()
                 .HasForeignKey(bm => bm.JournalEntryId).IsRequired(false).OnDelete(DeleteBehavior.SetNull);
 
+            e.HasIndex(bm => bm.WorkspaceId).HasDatabaseName("idx_bank_movements_workspace_id");
             e.HasIndex(bm => bm.EntityId).HasDatabaseName("idx_bank_movements_entity_id");
             e.HasIndex(bm => bm.JournalEntryId).HasDatabaseName("idx_bank_movements_journal_entry_id");
         });

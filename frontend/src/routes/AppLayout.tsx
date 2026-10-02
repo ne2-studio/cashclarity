@@ -16,9 +16,10 @@ import { SidebarActionItem, SidebarNavItem } from '../design-system';
 interface AppLayoutProps {
   children: React.ReactNode;
   onLogout: () => void;
+  workspaceSwitcher?: React.ReactNode;
 }
 
-export function AppLayout({ children, onLogout }: AppLayoutProps) {
+export function AppLayout({ children, onLogout, workspaceSwitcher }: AppLayoutProps) {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/' },
@@ -65,6 +66,8 @@ export function AppLayout({ children, onLogout }: AppLayoutProps) {
             <ShieldCheck className="w-6 h-6 text-primary-orange" />
             <h1 className="text-lg font-bold tracking-tight uppercase font-mono">CashClarity</h1>
           </div>
+          <div className="flex items-center gap-3">
+            {workspaceSwitcher}
           <button
             type="button"
             className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-sm border border-border text-text-secondary hover:bg-surface-elevated hover:text-text-primary"
@@ -74,6 +77,7 @@ export function AppLayout({ children, onLogout }: AppLayoutProps) {
           >
             {isMobileNavOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
+          </div>
         </header>
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden">

@@ -7,31 +7,25 @@ namespace CashClarity.Api.Repositories;
 
 public interface IAccountsRepository
 {
-    Task<List<AccountResponse>> GetAccounts(string userId);
-    Task<AccountResponse> AddAccount(AccountCreateRequest req, string userId);
-    Task UpdateAccount(string id, AccountPatchRequest patch, string userId);
-    Task DeleteAccount(string id, string userId);
+    Task<List<AccountResponse>> GetAccounts(string userId, Guid workspaceId);
+    Task<AccountResponse> AddAccount(AccountCreateRequest req, string userId, Guid workspaceId);
+    Task UpdateAccount(string id, AccountPatchRequest patch, string userId, Guid workspaceId);
+    Task DeleteAccount(string id, string userId, Guid workspaceId);
 }
 
 public class AccountsRepository(FinanceDbContext db) : IAccountsRepository
 {
-    private static readonly (string Code, string Name, string Type)[] SystemAccounts =
-    [
-        ("0001", "Cuenta Principal", "main"),
-        ("9999", "Sin categorizar", "uncategorized"),
-    ];
-
-    public async Task<List<AccountResponse>> GetAccounts(string userId)
+    public async Task<List<AccountResponse>> GetAccounts(string userId, Guid workspaceId)
     {
-        await EnsureSystemAccounts(userId);
+        await EnsureSystemAccounts(userId, workspaceId);
         return await db.Accounts
-            .Where(a => a.UserId == userId)
+            .Where(a => a.WorkspaceId == workspaceId)
             .OrderBy(a => a.Name)
-            .Select(a => new AccountResponse(a.Id, a.Code, a.Name, a.Type, a.Balance, a.IsSystem, userId))
+            .Select(a => new AccountResponse(a.Id, a.Code, a.Name, a.Type, a.Balance, a.IsSystem, userId, workspaceId.ToString()))
             .ToListAsync();
     }
 
-    public async Task<AccountResponse> AddAccount(AccountCreateRequest req, string userId)
+    public async Task<AccountResponse> AddAccount(AccountCreateRequest req, string userId, Guid workspaceId)
     {
         var account = new Account
         {
@@ -41,16 +35,17 @@ public class AccountsRepository(FinanceDbContext db) : IAccountsRepository
             Balance = req.Balance,
             IsSystem = req.IsSystem ?? false,
             UserId = userId,
+            WorkspaceId = workspaceId,
         };
         db.Accounts.Add(account);
         await db.SaveChangesAsync();
-        return MapAccount(account, userId);
+        return MapAccount(account);
     }
 
-    public async Task UpdateAccount(string id, AccountPatchRequest patch, string userId)
+    public async Task UpdateAccount(string id, AccountPatchRequest patch, string userId, Guid workspaceId)
     {
         var account = await db.Accounts
-            .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId)
+            .FirstOrDefaultAsync(a => a.Id == id && a.WorkspaceId == workspaceId)
             ?? throw new Exception("Account not found or access denied");
 
         if (patch.Code is not null) account.Code = patch.Code;
@@ -62,10 +57,10 @@ public class AccountsRepository(FinanceDbContext db) : IAccountsRepository
         await db.SaveChangesAsync();
     }
 
-    public async Task DeleteAccount(string id, string userId)
+    public async Task DeleteAccount(string id, string userId, Guid workspaceId)
     {
         var account = await db.Accounts
-            .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
+            .FirstOrDefaultAsync(a => a.Id == id && a.WorkspaceId == workspaceId);
         if (account is null) return;
 
         var hasReferencingJournalLines = await db.JournalLines.AnyAsync(l => l.AccountId == id);
@@ -75,18 +70,18 @@ public class AccountsRepository(FinanceDbContext db) : IAccountsRepository
         await db.SaveChangesAsync();
     }
 
-    private async Task EnsureSystemAccounts(string userId)
+    private async Task EnsureSystemAccounts(string userId, Guid workspaceId)
     {
-        foreach (var (code, name, type) in SystemAccounts)
+        foreach (var (code, name, type) in SystemAccountCatalog.All)
         {
             await db.Database.ExecuteSqlInterpolatedAsync($"""
-                INSERT INTO accounts (code, name, type, is_system, balance, user_id)
-                VALUES ({code}, {name}, {type}, true, 0, {userId})
-                ON CONFLICT (user_id, code) DO NOTHING
+                INSERT INTO accounts (code, name, type, is_system, balance, user_id, workspace_id)
+                VALUES ({code}, {name}, {type}, true, 0, {userId}, {workspaceId})
+                ON CONFLICT (workspace_id, code) DO NOTHING
                 """);
         }
     }
 
-    private static AccountResponse MapAccount(Account a, string userId) =>
-        new(a.Id, a.Code, a.Name, a.Type, a.Balance, a.IsSystem, userId);
+    private static AccountResponse MapAccount(Account a) =>
+        new(a.Id, a.Code, a.Name, a.Type, a.Balance, a.IsSystem, a.UserId, a.WorkspaceId.ToString());
 }

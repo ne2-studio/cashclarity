@@ -7,34 +7,36 @@ namespace CashClarity.Api.Repositories;
 
 public interface IJournalEntriesRepository
 {
-    Task<List<JournalEntryResponse>> GetJournalEntries(string userId);
-    Task<JournalEntryResponse> AddJournalEntry(JournalEntryCreateRequest req, string userId);
-    Task UpdateJournalEntry(string id, JournalEntryPatchRequest patch, string userId);
-    Task DeleteJournalEntry(string id, string userId);
+    Task<List<JournalEntryResponse>> GetJournalEntries(string userId, Guid workspaceId);
+    Task<JournalEntryResponse> AddJournalEntry(JournalEntryCreateRequest req, string userId, Guid workspaceId);
+    Task UpdateJournalEntry(string id, JournalEntryPatchRequest patch, string userId, Guid workspaceId);
+    Task DeleteJournalEntry(string id, string userId, Guid workspaceId);
 }
 
 public class JournalEntriesRepository(FinanceDbContext db) : IJournalEntriesRepository
 {
-    public async Task<List<JournalEntryResponse>> GetJournalEntries(string userId)
+    public async Task<List<JournalEntryResponse>> GetJournalEntries(string userId, Guid workspaceId)
     {
         var entries = await db.JournalEntries
             .Include(je => je.Lines)
-            .Where(je => je.UserId == userId)
+            .Where(je => je.WorkspaceId == workspaceId)
             .OrderByDescending(je => je.Date)
             .ToListAsync();
 
-        return entries.Select(e => MapEntry(e, userId)).ToList();
+        return entries.Select(e => MapEntry(e)).ToList();
     }
 
-    public async Task<JournalEntryResponse> AddJournalEntry(JournalEntryCreateRequest req, string userId)
+    public async Task<JournalEntryResponse> AddJournalEntry(JournalEntryCreateRequest req, string userId, Guid workspaceId)
     {
         JournalEntryPolicy.EnsureBalanced(req.Lines.Select(l => (l.Debit, l.Credit)));
+        await EnsureAccountsInWorkspace(req.Lines, workspaceId);
 
         var entry = new JournalEntry
         {
             Date = ParseDate(req.Date),
             Description = req.Description,
             UserId = userId,
+            WorkspaceId = workspaceId,
             Lines = req.Lines.Select(l => new JournalLine
             {
                 AccountId = l.AccountId,
@@ -45,15 +47,15 @@ public class JournalEntriesRepository(FinanceDbContext db) : IJournalEntriesRepo
         };
         db.JournalEntries.Add(entry);
         await db.SaveChangesAsync();
-        return MapEntry(entry, userId);
+        return MapEntry(entry);
     }
 
-    public async Task UpdateJournalEntry(string id, JournalEntryPatchRequest patch, string userId)
+    public async Task UpdateJournalEntry(string id, JournalEntryPatchRequest patch, string userId, Guid workspaceId)
     {
         var entryId = Guid.Parse(id);
         var entry = await db.JournalEntries
             .Include(je => je.Lines)
-            .FirstOrDefaultAsync(je => je.Id == entryId && je.UserId == userId)
+            .FirstOrDefaultAsync(je => je.Id == entryId && je.WorkspaceId == workspaceId)
             ?? throw new Exception("Journal entry not found or access denied");
 
         if (patch.Date is not null) entry.Date = ParseDate(patch.Date);
@@ -62,6 +64,7 @@ public class JournalEntriesRepository(FinanceDbContext db) : IJournalEntriesRepo
         if (patch.Lines is not null)
         {
             JournalEntryPolicy.EnsureBalanced(patch.Lines.Select(l => (l.Debit, l.Credit)));
+            await EnsureAccountsInWorkspace(patch.Lines, workspaceId);
 
             entry.Lines.Clear();
             foreach (var l in patch.Lines)
@@ -79,18 +82,27 @@ public class JournalEntriesRepository(FinanceDbContext db) : IJournalEntriesRepo
         await db.SaveChangesAsync();
     }
 
-    public async Task DeleteJournalEntry(string id, string userId)
+    public async Task DeleteJournalEntry(string id, string userId, Guid workspaceId)
     {
         await db.JournalEntries
-            .Where(je => je.Id == Guid.Parse(id) && je.UserId == userId)
+            .Where(je => je.Id == Guid.Parse(id) && je.WorkspaceId == workspaceId)
             .ExecuteDeleteAsync();
+    }
+
+    private async Task EnsureAccountsInWorkspace(List<JournalLineRequest> lines, Guid workspaceId)
+    {
+        var accountIds = lines.Select(l => l.AccountId).Distinct().ToList();
+        var found = await db.Accounts
+            .CountAsync(a => a.WorkspaceId == workspaceId && accountIds.Contains(a.Id));
+        if (found != accountIds.Count)
+            throw new InvalidOperationException("Journal lines must reference accounts in the same workspace");
     }
 
     private static JournalLineResponse MapLine(JournalLine l) =>
         new(l.Id.ToString(), l.AccountId, l.Credit, l.Debit, l.Description);
 
-    private static JournalEntryResponse MapEntry(JournalEntry e, string userId) =>
-        new(e.Id.ToString(), e.Date, e.Description, e.Lines.Select(MapLine).ToList(), userId);
+    private static JournalEntryResponse MapEntry(JournalEntry e) =>
+        new(e.Id.ToString(), e.Date, e.Description, e.Lines.Select(MapLine).ToList(), e.UserId, e.WorkspaceId.ToString());
 
     private static DateTime ParseDate(string date) =>
         DateTime.Parse(date, null,
