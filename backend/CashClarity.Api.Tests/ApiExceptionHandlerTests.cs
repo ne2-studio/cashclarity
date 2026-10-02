@@ -43,6 +43,6 @@ public class ApiExceptionHandlerTests
     public async Task Repositories_throw_NotFoundException_for_missing_resources()
     {
         await Assert.ThrowsAsync<NotFoundException>(() =>
-            new InMemoryAccountsRepository().UpdateAccount("missing", new Controllers.AccountPatchRequest(Name: "n"), "u"));
+            new InMemoryAccountsRepository().UpdateAccount("missing", new Contracts.AccountPatchRequest(Name: "n"), "u"));
     }
 }

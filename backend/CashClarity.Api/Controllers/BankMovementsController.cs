@@ -1,3 +1,4 @@
+using CashClarity.Api.Contracts;
 using CashClarity.Api.Repositories;
 using CashClarity.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -50,7 +51,3 @@ public class BankMovementsController(IBankMovementsRepository repo, IBankMovemen
         return Ok(new { success = true });
     }
 }
-
-public record BankMovementResponse(string Id, DateTime Date, string Description, decimal Amount, bool IsIdentified, string? EntityId, string? JournalEntryId, string UserId);
-public record BankMovementCreateRequest(string Date, string Description, decimal Amount, string? EntityId = null, string? JournalEntryId = null);
-public record BankMovementPatchRequest(string? Date = null, string? Description = null, decimal? Amount = null, bool? IsIdentified = null, string? EntityId = null, string? JournalEntryId = null);

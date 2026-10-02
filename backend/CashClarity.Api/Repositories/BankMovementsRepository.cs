@@ -1,5 +1,5 @@
 using CashClarity.Api.Data;
-using CashClarity.Api.Controllers;
+using CashClarity.Api.Contracts;
 using CashClarity.Api.Domain;
 using Microsoft.EntityFrameworkCore;
 
