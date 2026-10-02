@@ -65,7 +65,7 @@ public class InMemoryJournalEntriesRepository : IJournalEntriesRepository
         lock (gate)
         {
             var index = journalEntries.FindIndex(e => e.Id == id && e.UserId == userId);
-            if (index < 0) throw new Exception("Journal entry not found or access denied");
+            if (index < 0) throw new NotFoundException("Journal entry not found or access denied");
 
             var entry = journalEntries[index];
             journalEntries[index] = entry with

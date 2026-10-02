@@ -68,7 +68,7 @@ public class InMemoryAccountsRepository : IAccountsRepository
         lock (gate)
         {
             var index = accounts.FindIndex(a => a.Id == id && a.UserId == userId);
-            if (index < 0) throw new Exception("Account not found or access denied");
+            if (index < 0) throw new NotFoundException("Account not found or access denied");
 
             var account = accounts[index];
             accounts[index] = account with

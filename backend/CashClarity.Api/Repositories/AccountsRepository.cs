@@ -51,7 +51,7 @@ public class AccountsRepository(FinanceDbContext db) : IAccountsRepository
     {
         var account = await db.Accounts
             .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId)
-            ?? throw new Exception("Account not found or access denied");
+            ?? throw new NotFoundException("Account not found or access denied");
 
         if (patch.Code is not null) account.Code = patch.Code;
         if (patch.Name is not null) account.Name = patch.Name;
