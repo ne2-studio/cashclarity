@@ -118,6 +118,6 @@ components/  →  store/use{Domain}Store (Zustand)  →  api.ts (fetch client)  
 
 ## Cross-cutting / deployment
 
-- **CI/CD**: two independent GitHub Actions workflows (`backend-deploy.yml`, `frontend-deploy.yml`), path-filtered so each only runs when its own directory changes. Both: build → (backend also runs `dotnet test`) → build a Docker image → push to a container registry (e.g. GHCR) → trigger a deploy webhook.
+- **CI/CD**: two independent GitHub Actions workflows (`backend-deploy.yml`, `frontend-deploy.yml`), path-filtered so each only runs when its own directory changes. Both: a build/test job on every branch and PR (tests, Docker image build without push, scan, acceptance), then a deploy job on `main` only that pushes the image to a container registry (e.g. GHCR) and triggers a deploy webhook.
 - **Containers**: backend is a multi-stage .NET SDK→ASP.NET runtime image exposing port 8080. Frontend is built by Vite in CI, then the static `dist/` is copied into an `nginx:alpine` image (port 80) with a minimal SPA-fallback `nginx.conf` (`try_files $uri $uri/ /index.html`).
 - **No shared package/types** between frontend and backend — DTO shapes are duplicated by hand (backend DTOs vs. `types.ts` classes) and must be kept in sync manually, unless a project specifically justifies a shared-types package.
