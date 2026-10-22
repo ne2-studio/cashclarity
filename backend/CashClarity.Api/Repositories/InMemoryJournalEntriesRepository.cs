@@ -73,7 +73,7 @@ public class InMemoryJournalEntriesRepository : IJournalEntriesRepository
         lock (gate)
         {
             var index = journalEntries.FindIndex(e => e.Id == id && e.WorkspaceId == ws);
-            if (index < 0) throw new Exception("Journal entry not found or access denied");
+            if (index < 0) throw new NotFoundException("Journal entry not found or access denied");
             if (patch.Lines is not null) EnsureAccountsInWorkspace(patch.Lines, ws);
 
             var entry = journalEntries[index];

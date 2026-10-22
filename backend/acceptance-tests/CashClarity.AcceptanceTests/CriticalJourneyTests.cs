@@ -9,6 +9,31 @@ namespace CashClarity.AcceptanceTests;
 [Collection(AcceptanceCollection.Name)]
 public class CriticalJourneyTests(AcceptanceFixture fixture)
 {
+    [Theory]
+    [InlineData("accounts")]
+    [InlineData("journal-entries")]
+    [InlineData("bank-movements")]
+    public async Task Patching_a_missing_resource_returns_404(string resource)
+    {
+        using var client = await CreateAuthenticatedClientAsync(AcceptanceFixture.OidcUserKey);
+        var ws = await CreateWorkspaceAsync(client, "Missing resource acceptance");
+
+        var response = await client.PatchAsJsonAsync($"{ws}/{resource}/{Guid.NewGuid()}", new { description = "x", name = "x" });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patching_with_a_malformed_id_returns_400()
+    {
+        using var client = await CreateAuthenticatedClientAsync(AcceptanceFixture.OidcUserKey);
+        var ws = await CreateWorkspaceAsync(client, "Malformed id acceptance");
+
+        var response = await client.PatchAsJsonAsync($"{ws}/bank-movements/not-a-guid", new { description = "x" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task Account_onboarding_journey_initializes_system_accounts_and_manages_a_user_space()
     {

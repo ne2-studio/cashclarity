@@ -69,7 +69,7 @@ public class BankMovementsRepository(FinanceDbContext db) : IBankMovementsReposi
     {
         var movement = await db.BankMovements
             .FirstOrDefaultAsync(bm => bm.Id == Guid.Parse(id) && bm.WorkspaceId == workspaceId)
-            ?? throw new Exception("Bank movement not found or access denied");
+            ?? throw new NotFoundException("Bank movement not found or access denied");
 
         await EnsureLinksInWorkspace([new BankMovementCreateRequest("", "", 0, patch.EntityId, patch.JournalEntryId)], workspaceId);
 

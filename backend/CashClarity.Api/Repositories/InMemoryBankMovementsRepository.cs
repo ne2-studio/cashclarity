@@ -1,4 +1,5 @@
 using CashClarity.Api.Contracts;
+using CashClarity.Api.Domain;
 
 namespace CashClarity.Api.Repositories;
 
@@ -84,7 +85,7 @@ public class InMemoryBankMovementsRepository : IBankMovementsRepository
         lock (gate)
         {
             var index = bankMovements.FindIndex(m => m.Id == id && m.WorkspaceId == ws);
-            if (index < 0) throw new Exception("Bank movement not found or access denied");
+            if (index < 0) throw new NotFoundException("Bank movement not found or access denied");
 
             EnsureLinksInWorkspace(patch.EntityId, patch.JournalEntryId, ws);
             var movement = bankMovements[index];

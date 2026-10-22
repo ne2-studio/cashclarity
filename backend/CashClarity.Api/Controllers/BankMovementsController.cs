@@ -14,49 +14,40 @@ public class BankMovementsController(IBankMovementsRepository repo, IBankMovemen
     [HttpGet]
     public async Task<IActionResult> GetBankMovements()
     {
-        try { return Ok(await repo.GetBankMovements(UserId, WorkspaceId)); }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        return Ok(await repo.GetBankMovements(UserId, WorkspaceId));
     }
 
     [HttpPost]
     public async Task<IActionResult> AddBankMovement([FromBody] BankMovementCreateRequest body)
     {
-        try { return Ok(await repo.AddBankMovement(body, UserId, WorkspaceId)); }
-        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        return Ok(await repo.AddBankMovement(body, UserId, WorkspaceId));
     }
 
     [HttpPost("imports/preview")]
     public async Task<IActionResult> PreviewImport(IFormFile file)
     {
-        try
-        {
-            if (file.Length == 0) return BadRequest(new { error = "CSV file is required" });
-            await using var stream = file.OpenReadStream();
-            return Ok(await imports.Preview(stream, UserId, WorkspaceId));
-        }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        if (file.Length == 0) return BadRequest(new { error = "CSV file is required" });
+        await using var stream = file.OpenReadStream();
+        return Ok(await imports.Preview(stream, UserId, WorkspaceId));
     }
 
     [HttpPost("imports")]
     public async Task<IActionResult> CommitImport([FromBody] BankMovementImportCommitRequest body)
     {
-        try { return Ok(await imports.Commit(body, UserId, WorkspaceId)); }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        return Ok(await imports.Commit(body, UserId, WorkspaceId));
     }
 
     [HttpPatch("{id}")]
     public async Task<IActionResult> UpdateBankMovement(string id, [FromBody] BankMovementPatchRequest body)
     {
-        try { await repo.UpdateBankMovement(id, body, UserId, WorkspaceId); return Ok(new { success = true }); }
-        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        await repo.UpdateBankMovement(id, body, UserId, WorkspaceId);
+        return Ok(new { success = true });
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteBankMovement(string id)
     {
-        try { await repo.DeleteBankMovement(id, UserId, WorkspaceId); return Ok(new { success = true }); }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        await repo.DeleteBankMovement(id, UserId, WorkspaceId);
+        return Ok(new { success = true });
     }
 }

@@ -29,6 +29,8 @@ builder.Services.AddScoped<IJournalEntriesRepository, JournalEntriesRepository>(
 builder.Services.AddScoped<IBankMovementsRepository, BankMovementsRepository>();
 builder.Services.AddScoped<IBankMovementImportService, BankMovementImportService>();
 builder.Services.AddControllers();
+builder.Services.AddExceptionHandler<CashClarity.Api.ApiExceptionHandler>();
+builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -91,6 +93,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseExceptionHandler();
 app.UseCors();
 
 app.UseAuthentication();

@@ -3,7 +3,16 @@ name: Frontend CI/CD
 on:
   push:
     branches:
-      - main
+      - '**'
+    paths:
+      - '.github/workflows/frontend-deploy.yml'
+      - '.github/actions/**'
+      - 'frontend/**'
+      - 'backend/CashClarity.Api/**'
+      - 'backend/CashClarity.Api.Lite/**'
+      - 'scripts/**'
+      - 'docker-compose.lite.yml'
+  pull_request:
     paths:
       - '.github/workflows/frontend-deploy.yml'
       - '.github/actions/**'
@@ -15,11 +24,10 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: frontend-cicd-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   IMAGE_NAME: ghcr.io/ne2-studio/cashclarity-frontend
@@ -94,6 +102,28 @@ jobs:
           path: frontend/playwright-report/
           retention-days: 7
 
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build setup
+        uses: ./.github/actions/setup-node-package
+        with:
+          working-directory: frontend
+
+      - name: Build Vite app for image
+        working-directory: frontend
+        run: npm run build
+
       - name: Release frontend image
         uses: ./.github/actions/release-ghcr-image
         with:
@@ -103,15 +133,6 @@ jobs:
           sha: ${{ github.sha }}
           username: ${{ github.actor }}
           token: ${{ secrets.GITHUB_TOKEN }}
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v4
 
       - name: Deploy frontend
         uses: ./.github/actions/deploy-coolify
