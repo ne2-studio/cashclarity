@@ -121,3 +121,14 @@ components/  →  store/use{Domain}Store (Zustand)  →  api.ts (fetch client)  
 - **CI/CD**: two independent GitHub Actions workflows (`backend-deploy.yml`, `frontend-deploy.yml`), path-filtered so each only runs when its own directory changes. Both: a build/test job on every branch and PR (tests, Docker image build without push, scan, acceptance), then a deploy job on `main` only that pushes the image to a container registry (e.g. GHCR) and triggers a deploy webhook.
 - **Containers**: backend is a multi-stage .NET SDK→ASP.NET runtime image exposing port 8080. Frontend is built by Vite in CI, then the static `dist/` is copied into an `nginx:alpine` image (port 80) with a minimal SPA-fallback `nginx.conf` (`try_files $uri $uri/ /index.html`).
 - **No shared package/types** between frontend and backend — DTO shapes are duplicated by hand (backend DTOs vs. `types.ts` classes) and must be kept in sync manually, unless a project specifically justifies a shared-types package.
+
+---
+
+## CashClarity: workspaces
+
+A user owns N **workspaces**; 1 workspace = 1 bank statement of 1 bank account (no bank-account details yet), with its own chart of accounts and journal.
+
+- **Data model**: `workspaces` (Guid id, name ≤ 100 chars, `UserId`, timestamps). `accounts`, `journal_entries` and `bank_movements` carry a required `WorkspaceId` FK (no cascade; deleting workspaces is out of scope) and keep `UserId` for ownership. The account unique index is `(WorkspaceId, Code)`. System accounts are seeded when a workspace is created and `GetAccounts` still lazily ensures them per workspace.
+- **API**: `GET/POST server/workspaces` (list / create `{name}`; empty or too-long name → 400, duplicate names allowed). Accounts, journal entries and bank movements live under `server/workspaces/{workspaceId}/...`. `WorkspaceOwnershipFilter` rejects a workspace not owned by the caller with 404 (never leaking other users' workspaces). Repositories take `workspaceId` explicitly; journal lines, bank-movement entity links and journal links must stay inside the workspace (400 otherwise).
+- **Migration** `AddWorkspaces`: creates one `Principal` workspace per distinct existing `user_id` and backfills `workspace_id` before making the column non-null.
+- **Frontend**: `useWorkspaceStore` holds the workspaces and the active id (persisted in `localStorage` under `cashclarity.activeWorkspaceId`, falling back to the first workspace when missing/invalid) and pushes it into `api.ts` (`setActiveWorkspaceId`). The navbar `WorkspaceSwitcher` lists workspaces and offers "Crear nuevo workspace" (modal). Changing workspace clears finance data and reloads it. A user with zero workspaces sees the full-screen "Crea tu primer workspace" screen instead of the dashboard.

@@ -20,8 +20,10 @@ public class SmokeTests(AcceptanceFixture fixture)
     [Fact]
     public async Task Protected_routes_reject_anonymous_requests()
     {
-        using var response = await fixture.Client.GetAsync("/server/accounts");
+        using var response = await fixture.Client.GetAsync("/server/workspaces");
+        using var scoped = await fixture.Client.GetAsync($"/server/workspaces/{Guid.NewGuid()}/accounts");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, scoped.StatusCode);
     }
 }

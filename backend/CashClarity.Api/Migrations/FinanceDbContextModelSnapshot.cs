@@ -75,11 +75,15 @@ namespace CashClarity.Api.Migrations
                         .HasColumnType("text")
                         .HasColumnName("user_id");
 
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId", "Code")
+                    b.HasIndex("WorkspaceId", "Code")
                         .IsUnique()
-                        .HasDatabaseName("accounts_user_id_code_key");
+                        .HasDatabaseName("accounts_workspace_id_code_key");
 
                     b.ToTable("accounts", (string)null);
                 });
@@ -139,6 +143,10 @@ namespace CashClarity.Api.Migrations
                         .HasColumnType("text")
                         .HasColumnName("user_id");
 
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EntityId")
@@ -146,6 +154,9 @@ namespace CashClarity.Api.Migrations
 
                     b.HasIndex("JournalEntryId")
                         .HasDatabaseName("idx_bank_movements_journal_entry_id");
+
+                    b.HasIndex("WorkspaceId")
+                        .HasDatabaseName("idx_bank_movements_workspace_id");
 
                     b.ToTable("bank_movements", (string)null);
                 });
@@ -185,7 +196,14 @@ namespace CashClarity.Api.Migrations
                         .HasColumnType("text")
                         .HasColumnName("user_id");
 
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId")
+                        .HasDatabaseName("idx_journal_entries_workspace_id");
 
                     b.ToTable("journal_entries", (string)null);
                 });
@@ -248,6 +266,54 @@ namespace CashClarity.Api.Migrations
                     b.ToTable("journal_lines", (string)null);
                 });
 
+            modelBuilder.Entity("CashClarity.Api.Domain.Workspace", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("timezone('utc'::text, now())");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("timezone('utc'::text, now())");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("idx_workspaces_user_id");
+
+                    b.ToTable("workspaces", (string)null);
+                });
+
+            modelBuilder.Entity("CashClarity.Api.Domain.Account", b =>
+                {
+                    b.HasOne("CashClarity.Api.Domain.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("CashClarity.Api.Domain.BankMovement", b =>
                 {
                     b.HasOne("CashClarity.Api.Domain.Account", null)
@@ -259,6 +325,21 @@ namespace CashClarity.Api.Migrations
                         .WithMany()
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("CashClarity.Api.Domain.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CashClarity.Api.Domain.JournalEntry", b =>
+                {
+                    b.HasOne("CashClarity.Api.Domain.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("CashClarity.Api.Domain.JournalLine", b =>

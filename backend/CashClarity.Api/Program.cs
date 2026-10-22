@@ -1,3 +1,4 @@
+using CashClarity.Api.Controllers;
 using CashClarity.Api.Data;
 using CashClarity.Api.Repositories;
 using CashClarity.Api.Services;
@@ -21,6 +22,8 @@ builder.Services.AddCors(options =>
 
 var databaseUrl = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<FinanceDbContext>(opts => opts.UseNpgsql(databaseUrl));
+builder.Services.AddScoped<IWorkspacesRepository, WorkspacesRepository>();
+builder.Services.AddScoped<WorkspaceOwnershipFilter>();
 builder.Services.AddScoped<IAccountsRepository, AccountsRepository>();
 builder.Services.AddScoped<IJournalEntriesRepository, JournalEntriesRepository>();
 builder.Services.AddScoped<IBankMovementsRepository, BankMovementsRepository>();
