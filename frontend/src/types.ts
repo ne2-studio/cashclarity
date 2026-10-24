@@ -71,6 +71,7 @@ export class BankMovement {
   isIdentified: boolean;
   entityId?: string;
   journalEntryId?: string;
+  externalId?: string | null; // Clave del banco si viene de la sincronización
 
   constructor(data: {
     id: string;
@@ -80,6 +81,7 @@ export class BankMovement {
     isIdentified: boolean;
     entityId?: string;
     journalEntryId?: string;
+    externalId?: string | null;
   }) {
     this.id = data.id;
     this.date = data.date;
@@ -88,5 +90,6 @@ export class BankMovement {
     this.isIdentified = data.isIdentified;
     this.entityId = data.entityId;
     this.journalEntryId = data.journalEntryId;
+    this.externalId = data.externalId;
   }
 }

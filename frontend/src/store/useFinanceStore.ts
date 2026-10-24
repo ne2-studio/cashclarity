@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Account, JournalEntry, BankMovement, JournalLine } from '../types';
-import { api, type BankMovementImportCommitResult, type BankMovementImportPreview, type BankMovementImportRow, type DuplicatePolicy } from '../api';
+import { api, type BankSyncResult, type BankMovementImportCommitResult, type BankMovementImportPreview, type BankMovementImportRow, type DuplicatePolicy } from '../api';
 
 interface FinanceStore {
   accounts: Account[];
@@ -26,6 +26,7 @@ interface FinanceStore {
   commitBankMovementImport: (rows: BankMovementImportRow[], duplicatePolicy?: DuplicatePolicy) => Promise<BankMovementImportCommitResult>;
   updateBankMovement: (id: string, updates: Partial<BankMovement>) => Promise<void>;
   deleteBankMovement: (id: string) => Promise<void>;
+  syncBankLink: () => Promise<BankSyncResult>;
 }
 
 export const useFinanceStore = create<FinanceStore>((set, get) => ({
@@ -143,5 +144,11 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
     set((state) => ({
       bankMovements: state.bankMovements.filter((m) => m.id !== id),
     }));
+  },
+
+  syncBankLink: async () => {
+    const result = await api.bankLink.sync();
+    set((state) => ({ bankMovements: [...result.created, ...state.bankMovements] }));
+    return result;
   },
 }));

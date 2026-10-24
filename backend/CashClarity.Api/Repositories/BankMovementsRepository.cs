@@ -10,6 +10,9 @@ public interface IBankMovementsRepository
     Task<List<BankMovementResponse>> GetBankMovements(string userId);
     Task<BankMovementResponse> AddBankMovement(BankMovementCreateRequest req, string userId);
     Task<List<BankMovementResponse>> AddBankMovements(List<BankMovementCreateRequest> requests, string userId);
+
+    /// <summary>Inserta los movimientos cuyo ExternalId aún no existe para el usuario y devuelve solo los creados.</summary>
+    Task<List<BankMovementResponse>> AddSyncedBankMovements(List<SyncedBankMovementCreate> movements, string userId);
     Task UpdateBankMovement(string id, BankMovementPatchRequest patch, string userId);
     Task DeleteBankMovement(string id, string userId);
 }
@@ -61,6 +64,33 @@ public class BankMovementsRepository(FinanceDbContext db) : IBankMovementsReposi
         return movements.Select(MapBankMovement).ToList();
     }
 
+    public async Task<List<BankMovementResponse>> AddSyncedBankMovements(List<SyncedBankMovementCreate> movements, string userId)
+    {
+        var candidateIds = movements.Select(m => m.ExternalId).ToList();
+        var existingIds = await db.BankMovements
+            .Where(bm => bm.UserId == userId && bm.ExternalId != null && candidateIds.Contains(bm.ExternalId))
+            .Select(bm => bm.ExternalId!)
+            .ToListAsync();
+        var known = existingIds.ToHashSet();
+
+        var created = movements
+            .Where(m => known.Add(m.ExternalId))
+            .Select(m => new BankMovement
+            {
+                Date = m.Date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
+                Description = m.Description,
+                Amount = m.Amount,
+                IsIdentified = false,
+                UserId = userId,
+                ExternalId = m.ExternalId,
+            })
+            .ToList();
+
+        db.BankMovements.AddRange(created);
+        await db.SaveChangesAsync();
+        return created.Select(MapBankMovement).ToList();
+    }
+
     public async Task UpdateBankMovement(string id, BankMovementPatchRequest patch, string userId)
     {
         var movement = await db.BankMovements
@@ -86,7 +116,7 @@ public class BankMovementsRepository(FinanceDbContext db) : IBankMovementsReposi
 
     private static BankMovementResponse MapBankMovement(BankMovement bm) =>
         new(bm.Id.ToString(), bm.Date, bm.Description, bm.Amount, bm.IsIdentified,
-            bm.EntityId, bm.JournalEntryId?.ToString(), bm.UserId.ToString());
+            bm.EntityId, bm.JournalEntryId?.ToString(), bm.UserId.ToString(), bm.ExternalId);
 
     private static DateTime ParseDate(string date) =>
         DateTime.Parse(date, null,

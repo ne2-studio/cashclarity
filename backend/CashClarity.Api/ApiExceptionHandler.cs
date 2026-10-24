@@ -1,4 +1,5 @@
 using CashClarity.Api.Domain;
+using CashClarity.Api.Services.EnableBanking;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,6 +13,8 @@ public class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : IExcepti
     public static (int Status, string Message) Map(Exception exception) => exception switch
     {
         NotFoundException e => (StatusCodes.Status404NotFound, e.Message),
+        BankProviderException { ConsentInvalid: true } e => (StatusCodes.Status400BadRequest, e.Message),
+        BankProviderException e => (StatusCodes.Status502BadGateway, e.Message),
         InvalidOperationException e => (StatusCodes.Status400BadRequest, e.Message),
         FormatException => (StatusCodes.Status400BadRequest, "Malformed identifier or value"),
         _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred"),

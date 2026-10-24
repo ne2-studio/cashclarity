@@ -84,6 +84,99 @@ namespace CashClarity.Api.Migrations
                     b.ToTable("accounts", (string)null);
                 });
 
+            modelBuilder.Entity("CashClarity.Api.Domain.BankLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("AccountName")
+                        .HasColumnType("text")
+                        .HasColumnName("account_name");
+
+                    b.Property<string>("AccountOptionsJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("account_options");
+
+                    b.Property<string>("AccountUid")
+                        .HasColumnType("text")
+                        .HasColumnName("account_uid");
+
+                    b.Property<string>("AspspCountry")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("aspsp_country");
+
+                    b.Property<string>("AspspName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("aspsp_name");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("timezone('utc'::text, now())");
+
+                    b.Property<string>("Currency")
+                        .HasColumnType("text")
+                        .HasColumnName("currency");
+
+                    b.Property<string>("Iban")
+                        .HasColumnType("text")
+                        .HasColumnName("iban");
+
+                    b.Property<DateTime?>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_synced_at");
+
+                    b.Property<string>("PendingState")
+                        .HasColumnType("text")
+                        .HasColumnName("pending_state");
+
+                    b.Property<DateTime?>("PendingStateExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("pending_state_expires_at");
+
+                    b.Property<string>("PsuType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("psu_type");
+
+                    b.Property<string>("SessionId")
+                        .HasColumnType("text")
+                        .HasColumnName("session_id");
+
+                    b.Property<DateOnly>("SyncFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("sync_from");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("timezone('utc'::text, now())");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTime?>("ValidUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("valid_until");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("bank_links_user_id_key");
+
+                    b.ToTable("bank_links", (string)null);
+                });
+
             modelBuilder.Entity("CashClarity.Api.Domain.BankMovement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -118,6 +211,10 @@ namespace CashClarity.Api.Migrations
                         .HasColumnType("text")
                         .HasColumnName("entity_id");
 
+                    b.Property<string>("ExternalId")
+                        .HasColumnType("text")
+                        .HasColumnName("external_id");
+
                     b.Property<bool>("IsIdentified")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -146,6 +243,11 @@ namespace CashClarity.Api.Migrations
 
                     b.HasIndex("JournalEntryId")
                         .HasDatabaseName("idx_bank_movements_journal_entry_id");
+
+                    b.HasIndex("UserId", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("bank_movements_user_id_external_id_key")
+                        .HasFilter("external_id IS NOT NULL");
 
                     b.ToTable("bank_movements", (string)null);
                 });
