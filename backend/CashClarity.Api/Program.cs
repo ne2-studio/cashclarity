@@ -1,10 +1,12 @@
 using CashClarity.Api.Controllers;
 using CashClarity.Api.Data;
+using CashClarity.Api.Mcp;
 using CashClarity.Api.Repositories;
 using CashClarity.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
+using ModelContextProtocol.AspNetCore.Authentication;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
@@ -29,6 +31,7 @@ builder.Services.AddScoped<IJournalEntriesRepository, JournalEntriesRepository>(
 builder.Services.AddScoped<IBankMovementsRepository, BankMovementsRepository>();
 builder.Services.AddScoped<IBankMovementImportService, BankMovementImportService>();
 builder.Services.AddControllers();
+builder.Services.AddCashClarityMcp();
 builder.Services.AddExceptionHandler<CashClarity.Api.ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
@@ -54,13 +57,15 @@ builder.Host.UseSerilog((context, services, loggerConfiguration) =>
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    // The MCP scheme answers 401 with a WWW-Authenticate header pointing to the protected
+    // resource metadata, which MCP clients use to discover the OIDC provider.
+    options.DefaultChallengeScheme = McpAuthenticationDefaults.AuthenticationScheme;
 }).AddJwtBearer(options =>
 {
     options.Authority = builder.Configuration["Auth:Authority"];
     options.Audience = builder.Configuration["Auth:Audience"];
     options.RequireHttpsMetadata = builder.Configuration.GetValue("Auth:RequireHttpsMetadata", true);
-});
+}).AddCashClarityMcpChallenge(builder.Configuration);
 
 var app = builder.Build();
 
@@ -100,6 +105,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseSerilogRequestLogging();
 app.MapControllers();
+app.MapCashClarityMcp();
 
 app.Run();
 
