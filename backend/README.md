@@ -10,3 +10,5 @@
 
 `CashClarity.Api.Lite` is the in-memory backend for frontend acceptance. See
 [`docs/operations/api-lite.md`](../docs/operations/api-lite.md).
+
+Servidor MCP (`/mcp`): ver [`docs/operations/mcp.md`](../docs/operations/mcp.md).
