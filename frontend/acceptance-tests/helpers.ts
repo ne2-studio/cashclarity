@@ -24,12 +24,30 @@ export type BankMovementDto = {
   journalEntryId?: string;
 };
 
-export async function loginAsAcceptanceUser(page: Page): Promise<string> {
+export const DEFAULT_WORKSPACE_NAME = 'Principal';
+export const ACTIVE_WORKSPACE_STORAGE_KEY = 'cashclarity.activeWorkspaceId';
+
+export async function loginAsAcceptanceUser(
+  page: Page,
+  options: { createFirstWorkspace?: boolean } = {},
+): Promise<string> {
+  const { createFirstWorkspace = true } = options;
   await page.goto('/');
   await page.waitForURL('**/authorize**', { timeout: 15_000 });
   await page.getByRole('button', { name: 'Acceptance User' }).click();
   await page.waitForURL('/', { timeout: 15_000 });
-  await expect(page.getByRole('heading', { name: 'CashClarity' })).toBeVisible();
+
+  // A user without workspaces lands on the "create your first workspace" screen.
+  const firstWorkspaceScreen = page.getByRole('heading', { name: 'Crea tu primer workspace' });
+  await expect(firstWorkspaceScreen.or(page.getByRole('heading', { name: 'CashClarity' }))).toBeVisible();
+  if (createFirstWorkspace && (await firstWorkspaceScreen.isVisible())) {
+    await page.getByLabel('Nombre del workspace').fill(DEFAULT_WORKSPACE_NAME);
+    await page.getByRole('button', { name: 'Crear workspace' }).click();
+  }
+  if (createFirstWorkspace) {
+    await expect(page.getByRole('heading', { name: 'CashClarity' })).toBeVisible();
+    await expect(page.getByTestId('workspace-switcher')).toBeVisible();
+  }
 
   const accessToken = await page.evaluate(() => {
     const stores = [localStorage, sessionStorage];
@@ -46,6 +64,29 @@ export async function loginAsAcceptanceUser(page: Page): Promise<string> {
     return null;
   });
   return accessToken ?? 'acceptance-token';
+}
+
+export async function getActiveWorkspaceId(page: Page): Promise<string> {
+  const id = await page.evaluate((key) => localStorage.getItem(key), ACTIVE_WORKSPACE_STORAGE_KEY);
+  expect(id, 'an active workspace must be selected').toBeTruthy();
+  return id as string;
+}
+
+async function workspaceApiUrl(page: Page): Promise<string> {
+  return `${API_BASE_URL}/workspaces/${await getActiveWorkspaceId(page)}`;
+}
+
+export async function selectWorkspaceFromNavbar(page: Page, name: string) {
+  await page.getByTestId('workspace-switcher').click();
+  await page.getByRole('menuitemradio', { name }).click();
+}
+
+export async function createWorkspaceFromNavbar(page: Page, name: string) {
+  await page.getByTestId('workspace-switcher').click();
+  await page.getByRole('menuitem', { name: 'Crear nuevo workspace' }).click();
+  await page.getByLabel('Nombre del workspace').fill(name);
+  await page.getByRole('button', { name: 'Crear workspace' }).click();
+  await expect(page.getByRole('heading', { name: 'Crear nuevo workspace' })).toBeHidden();
 }
 
 export function collectUnexpectedBrowserErrors(page: Page, testInfo: TestInfo) {
@@ -74,7 +115,7 @@ export async function createAccountViaApi(
   accessToken: string,
   account: { code: string; name: string; type: 'space' | 'entity' },
 ): Promise<AccountDto> {
-  const response = await page.request.post(`${API_BASE_URL}/accounts`, {
+  const response = await page.request.post(`${await workspaceApiUrl(page)}/accounts`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     data: { ...account, active: true },
   });
@@ -83,7 +124,7 @@ export async function createAccountViaApi(
 }
 
 export async function getAccountsViaApi(page: Page, accessToken: string): Promise<AccountDto[]> {
-  const response = await page.request.get(`${API_BASE_URL}/accounts`, {
+  const response = await page.request.get(`${await workspaceApiUrl(page)}/accounts`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   expect(response.ok(), `failed to list accounts: ${response.status()} ${await response.text()}`).toBeTruthy();
@@ -95,7 +136,7 @@ export async function createBankMovementViaApi(
   accessToken: string,
   movement: { date: string; description: string; amount: number },
 ): Promise<BankMovementDto> {
-  const response = await page.request.post(`${API_BASE_URL}/bank-movements`, {
+  const response = await page.request.post(`${await workspaceApiUrl(page)}/bank-movements`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     data: movement,
   });

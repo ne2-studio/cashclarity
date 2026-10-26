@@ -11,17 +11,17 @@ namespace CashClarity.Api.Services;
 
 public interface IBankLinkService
 {
-    Task<BankLinkResponse> GetBankLink(string userId);
+    Task<BankLinkResponse> GetBankLink(string userId, Guid workspaceId);
     Task<List<BankAspspResponse>> GetAspsps(string country);
-    Task<BankAuthorizationStartResponse> StartAuthorization(BankAuthorizationStartRequest request, string userId);
-    Task<BankLinkResponse> CompleteAuthorization(BankAuthorizationCompleteRequest request, string userId);
-    Task<BankLinkResponse> SelectAccount(BankAccountSelectRequest request, string userId);
-    Task<BankSyncResponse> Sync(string userId);
-    Task Unlink(string userId);
+    Task<BankAuthorizationStartResponse> StartAuthorization(BankAuthorizationStartRequest request, string userId, Guid workspaceId);
+    Task<BankLinkResponse> CompleteAuthorization(BankAuthorizationCompleteRequest request, string userId, Guid workspaceId);
+    Task<BankLinkResponse> SelectAccount(BankAccountSelectRequest request, string userId, Guid workspaceId);
+    Task<BankSyncResponse> Sync(string userId, Guid workspaceId);
+    Task Unlink(string userId, Guid workspaceId);
 }
 
 /// <summary>
-/// Vincula el libro del usuario con una cuenta bancaria real (Enable Banking) y sincroniza sus
+/// Vincula un workspace con una cuenta bancaria real (Enable Banking) y sincroniza sus
 /// movimientos contabilizados de forma idempotente.
 /// </summary>
 public class BankLinkService(
@@ -41,8 +41,8 @@ public class BankLinkService(
     private static readonly string[] PsuTypes = ["personal", "business"];
     private static readonly string[] PreferredBalanceTypes = ["CLBD", "ITBD", "XPCD", "CLAV", "ITAV", "OPBD"];
 
-    public async Task<BankLinkResponse> GetBankLink(string userId) =>
-        ToResponse(await bankLinks.GetBankLink(userId));
+    public async Task<BankLinkResponse> GetBankLink(string userId, Guid workspaceId) =>
+        ToResponse(await bankLinks.GetBankLink(workspaceId));
 
     public async Task<List<BankAspspResponse>> GetAspsps(string country)
     {
@@ -59,7 +59,7 @@ public class BankLinkService(
             .ToList();
     }
 
-    public async Task<BankAuthorizationStartResponse> StartAuthorization(BankAuthorizationStartRequest request, string userId)
+    public async Task<BankAuthorizationStartResponse> StartAuthorization(BankAuthorizationStartRequest request, string userId, Guid workspaceId)
     {
         EnsureConfigured();
         if (!PsuTypes.Contains(request.PsuType))
@@ -74,10 +74,10 @@ public class BankLinkService(
         if (aspsp.PsuTypes is { Count: > 0 } supported && !supported.Contains(request.PsuType))
             throw new InvalidOperationException($"{aspsp.Name} no admite clientes de tipo {request.PsuType}");
 
-        var link = await bankLinks.GetBankLink(userId);
+        var link = await bankLinks.GetBankLink(workspaceId);
         if (link?.Iban is not null && link.AspspName != aspsp.Name)
             throw new InvalidOperationException(
-                $"Este libro ya está vinculado a {link.AspspName} ({link.Iban}). Desvincúlalo antes de vincular otro banco.");
+                $"Este workspace ya está vinculado a {link.AspspName} ({link.Iban}). Desvincúlalo antes de vincular otro banco.");
 
         var now = clock.GetUtcNow();
         var consentValidity = aspsp.MaximumConsentValidity is { } seconds && TimeSpan.FromSeconds(seconds) < MaxConsentValidity
@@ -89,8 +89,9 @@ public class BankLinkService(
         link ??= new BankLink
         {
             Id = Guid.NewGuid(),
+            WorkspaceId = workspaceId,
             UserId = userId,
-            SyncFrom = request.SyncFrom is null ? await DefaultSyncFrom(userId) : ParseDate(request.SyncFrom),
+            SyncFrom = request.SyncFrom is null ? await DefaultSyncFrom(userId, workspaceId) : ParseDate(request.SyncFrom),
             CreatedAt = now.UtcDateTime,
         };
         if (!isNew && request.SyncFrom is not null && link.LastSyncedAt is null) link.SyncFrom = ParseDate(request.SyncFrom);
@@ -114,10 +115,10 @@ public class BankLinkService(
         return new BankAuthorizationStartResponse(url);
     }
 
-    public async Task<BankLinkResponse> CompleteAuthorization(BankAuthorizationCompleteRequest request, string userId)
+    public async Task<BankLinkResponse> CompleteAuthorization(BankAuthorizationCompleteRequest request, string userId, Guid workspaceId)
     {
         EnsureConfigured();
-        var link = await bankLinks.GetBankLink(userId);
+        var link = await bankLinks.GetBankLink(workspaceId);
         if (link?.PendingState is null ||
             link.PendingStateExpiresAt < clock.GetUtcNow().UtcDateTime ||
             !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(link.PendingState), Encoding.UTF8.GetBytes(request.State ?? "")))
@@ -165,9 +166,9 @@ public class BankLinkService(
         return ToResponse(link);
     }
 
-    public async Task<BankLinkResponse> SelectAccount(BankAccountSelectRequest request, string userId)
+    public async Task<BankLinkResponse> SelectAccount(BankAccountSelectRequest request, string userId, Guid workspaceId)
     {
-        var link = await bankLinks.GetBankLink(userId) ?? throw new NotFoundException("No hay ninguna cuenta bancaria vinculada");
+        var link = await bankLinks.GetBankLink(workspaceId) ?? throw new NotFoundException("No hay ninguna cuenta bancaria vinculada");
         var option = ReadOptions(link).FirstOrDefault(o => o.Uid == request.AccountUid)
             ?? throw new InvalidOperationException("Cuenta no disponible en la autorización actual");
 
@@ -176,10 +177,10 @@ public class BankLinkService(
         return ToResponse(link);
     }
 
-    public async Task<BankSyncResponse> Sync(string userId)
+    public async Task<BankSyncResponse> Sync(string userId, Guid workspaceId)
     {
         EnsureConfigured();
-        var link = await bankLinks.GetBankLink(userId) ?? throw new NotFoundException("No hay ninguna cuenta bancaria vinculada");
+        var link = await bankLinks.GetBankLink(workspaceId) ?? throw new NotFoundException("No hay ninguna cuenta bancaria vinculada");
         var now = clock.GetUtcNow();
         var status = StatusOf(link);
         if (status == BankLinkStatus.Expired)
@@ -202,8 +203,8 @@ public class BankLinkService(
         } while (!string.IsNullOrEmpty(continuationKey));
 
         var mapped = EnableBankingTransactionMapper.Map(transactions);
-        var existing = await bankMovements.GetBankMovements(userId);
-        var created = await bankMovements.AddSyncedBankMovements(mapped, userId);
+        var existing = await bankMovements.GetBankMovements(userId, workspaceId);
+        var created = await bankMovements.AddSyncedBankMovements(mapped, userId, workspaceId);
 
         link.LastSyncedAt = now.UtcDateTime;
         await bankLinks.UpdateBankLink(link);
@@ -218,12 +219,12 @@ public class BankLinkService(
             ToResponse(link));
     }
 
-    public async Task Unlink(string userId)
+    public async Task Unlink(string userId, Guid workspaceId)
     {
-        var link = await bankLinks.GetBankLink(userId);
+        var link = await bankLinks.GetBankLink(workspaceId);
         if (link is null) return;
         if (link.SessionId is not null && enableBanking.IsConfigured) await TryDeleteSession(link.SessionId);
-        await bankLinks.DeleteBankLink(userId);
+        await bankLinks.DeleteBankLink(workspaceId);
     }
 
     /// <summary>
@@ -280,9 +281,9 @@ public class BankLinkService(
         }
     }
 
-    private async Task<DateOnly> DefaultSyncFrom(string userId)
+    private async Task<DateOnly> DefaultSyncFrom(string userId, Guid workspaceId)
     {
-        var latest = (await bankMovements.GetBankMovements(userId)).MaxBy(m => m.Date);
+        var latest = (await bankMovements.GetBankMovements(userId, workspaceId)).MaxBy(m => m.Date);
         return latest is null
             ? DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime).AddDays(-90)
             : DateOnly.FromDateTime(latest.Date).AddDays(1);

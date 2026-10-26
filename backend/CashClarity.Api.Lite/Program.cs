@@ -20,18 +20,26 @@ builder.Services.AddCors(options =>
         .WithMethods("GET", "POST", "PATCH", "DELETE", "OPTIONS")
         .WithExposedHeaders("Content-Length")));
 
+builder.Services.AddSingleton<List<AccountResponse>>();
 builder.Services.AddSingleton<List<JournalEntryResponse>>();
 builder.Services.AddSingleton<List<BankMovementResponse>>();
+builder.Services.AddSingleton<IWorkspacesRepository, InMemoryWorkspacesRepository>();
+builder.Services.AddSingleton<WorkspaceOwnershipFilter>();
 builder.Services.AddSingleton<IAccountsRepository>(services =>
     new InMemoryAccountsRepository(
+        services.GetRequiredService<List<AccountResponse>>(),
         services.GetRequiredService<List<JournalEntryResponse>>(),
         services.GetRequiredService<List<BankMovementResponse>>()));
 builder.Services.AddSingleton<IJournalEntriesRepository>(services =>
     new InMemoryJournalEntriesRepository(
+        services.GetRequiredService<List<AccountResponse>>(),
         services.GetRequiredService<List<JournalEntryResponse>>(),
         services.GetRequiredService<List<BankMovementResponse>>()));
 builder.Services.AddSingleton<IBankMovementsRepository>(services =>
-    new InMemoryBankMovementsRepository(services.GetRequiredService<List<BankMovementResponse>>()));
+    new InMemoryBankMovementsRepository(
+        services.GetRequiredService<List<BankMovementResponse>>(),
+        services.GetRequiredService<List<AccountResponse>>(),
+        services.GetRequiredService<List<JournalEntryResponse>>()));
 builder.Services.AddSingleton<IBankMovementImportService, BankMovementImportService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IBankLinksRepository, InMemoryBankLinksRepository>();

@@ -20,7 +20,8 @@ Notes:
 
 - No Postgres required.
 - Auth is deterministic fake auth; any request gets user `acceptance-user`, or
-  `x-test-user-id` if supplied.
+  `x-test-user-id` if supplied. Data is in memory and scoped per workspace
+  (`/server/workspaces/{workspaceId}/...`); a user must create a workspace first.
 - State lasts for the container process lifetime.
 - Frontend acceptance uses it through `docker-compose.lite.yml`.
 - Enable Banking se simula con `FakeEnableBankingClient`: vincular vuelve directamente a

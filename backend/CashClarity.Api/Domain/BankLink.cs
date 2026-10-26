@@ -1,12 +1,13 @@
 namespace CashClarity.Api.Domain;
 
 /// <summary>
-/// Vínculo entre el libro de un usuario y una cuenta bancaria real leída vía Enable Banking.
-/// Hay como máximo uno por libro (hoy, por usuario).
+/// Vínculo entre un workspace y una cuenta bancaria real leída vía Enable Banking.
+/// Hay como máximo uno por workspace.
 /// </summary>
 public class BankLink
 {
     public Guid Id { get; set; }
+    public Guid WorkspaceId { get; set; }
     public string UserId { get; set; } = "";
     public string AspspName { get; set; } = "";
     public string AspspCountry { get; set; } = "";

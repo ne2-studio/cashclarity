@@ -6,16 +6,16 @@ namespace CashClarity.Api.Repositories;
 
 public interface IBankLinksRepository
 {
-    Task<BankLink?> GetBankLink(string userId);
+    Task<BankLink?> GetBankLink(Guid workspaceId);
     Task AddBankLink(BankLink link);
     Task UpdateBankLink(BankLink link);
-    Task DeleteBankLink(string userId);
+    Task DeleteBankLink(Guid workspaceId);
 }
 
 public class BankLinksRepository(FinanceDbContext db) : IBankLinksRepository
 {
-    public Task<BankLink?> GetBankLink(string userId) =>
-        db.BankLinks.FirstOrDefaultAsync(bl => bl.UserId == userId);
+    public Task<BankLink?> GetBankLink(Guid workspaceId) =>
+        db.BankLinks.FirstOrDefaultAsync(bl => bl.WorkspaceId == workspaceId);
 
     public async Task AddBankLink(BankLink link)
     {
@@ -30,8 +30,8 @@ public class BankLinksRepository(FinanceDbContext db) : IBankLinksRepository
         await db.SaveChangesAsync();
     }
 
-    public async Task DeleteBankLink(string userId)
+    public async Task DeleteBankLink(Guid workspaceId)
     {
-        await db.BankLinks.Where(bl => bl.UserId == userId).ExecuteDeleteAsync();
+        await db.BankLinks.Where(bl => bl.WorkspaceId == workspaceId).ExecuteDeleteAsync();
     }
 }

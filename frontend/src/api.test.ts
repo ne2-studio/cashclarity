@@ -1,11 +1,14 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, setAccessToken } from './api';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { api, setAccessToken, setActiveWorkspaceId } from './api';
 
 describe('api client', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     setAccessToken(undefined);
+    setActiveWorkspaceId(undefined);
   });
+
+  beforeEach(() => setActiveWorkspaceId('ws-1'));
 
   it('maps account responses and sends bearer token', async () => {
     setAccessToken('token-1');
@@ -17,7 +20,7 @@ describe('api client', () => {
 
     expect(accounts[0].name).toBe('Cuenta Principal');
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:54321/functions/v1/server/accounts',
+      'http://127.0.0.1:54321/functions/v1/server/workspaces/ws-1/accounts',
       { headers: { 'Content-Type': 'application/json', Authorization: 'Bearer token-1' } },
     );
   });
@@ -38,7 +41,7 @@ describe('api client', () => {
     await api.bankMovements.previewImport(new File(['fecha;Concepto;cantidad'], 'movimientos.csv', { type: 'text/csv' }));
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:54321/functions/v1/server/bank-movements/imports/preview',
+      'http://127.0.0.1:54321/functions/v1/server/workspaces/ws-1/bank-movements/imports/preview',
       expect.objectContaining({
         method: 'POST',
         headers: { Authorization: 'Bearer token-1' },
@@ -60,7 +63,7 @@ describe('api client', () => {
 
     expect(result.created[0].description).toBe('Nomina');
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:54321/functions/v1/server/bank-movements/imports',
+      'http://127.0.0.1:54321/functions/v1/server/workspaces/ws-1/bank-movements/imports',
       expect.objectContaining({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -91,7 +94,7 @@ describe('api client', () => {
     expect(result.created[0].externalId).toBe('ref:1');
     expect(result.skippedExisting).toBe(2);
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:54321/functions/v1/server/bank-link/sync',
+      'http://127.0.0.1:54321/functions/v1/server/workspaces/ws-1/bank-link/sync',
       { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer token-1' } },
     );
   });
@@ -102,8 +105,40 @@ describe('api client', () => {
     await api.bankLink.completeAuthorization('code-1', 'state-1');
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:54321/functions/v1/server/bank-link/sessions',
+      'http://127.0.0.1:54321/functions/v1/server/workspaces/ws-1/bank-link/sessions',
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ code: 'code-1', state: 'state-1' }) }),
     );
+  });
+
+  it('completes the bank authorization in the workspace that started it', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ configured: true, status: 'active' })));
+
+    await api.bankLink.completeAuthorization('code-1', 'state-1', 'ws-9');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:54321/functions/v1/server/workspaces/ws-9/bank-link/sessions',
+      expect.anything(),
+    );
+  });
+
+  it('lists and creates workspaces without needing an active workspace', async () => {
+    setActiveWorkspaceId(undefined);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(
+      { id: 'ws-2', name: 'Nuevo', createdAt: '2026-10-02T00:00:00Z' },
+    )));
+
+    const created = await api.workspaces.create('Nuevo');
+
+    expect(created.id).toBe('ws-2');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:54321/functions/v1/server/workspaces',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ name: 'Nuevo' }) }),
+    );
+  });
+
+  it('refuses workspace-scoped calls when no workspace is active', async () => {
+    setActiveWorkspaceId(undefined);
+
+    await expect(api.accounts.getAll()).rejects.toThrow('No active workspace selected');
   });
 });

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
+import { BANK_LINK_WORKSPACE_STORAGE_KEY } from '../hooks/useBankLink';
+import { useWorkspaceStore } from '../store/useWorkspaceStore';
 
 /**
  * Destino de redirect_url de Enable Banking: el banco vuelve aquí con ?code&state (o ?error)
@@ -9,6 +11,7 @@ import { api } from '../api';
 export function BankLinkCallbackRoute() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const selectWorkspace = useWorkspaceStore((state) => state.selectWorkspace);
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
 
@@ -24,10 +27,15 @@ export function BankLinkCallbackRoute() {
       return;
     }
 
-    api.bankLink.completeAuthorization(code, state)
-      .then(() => navigate('/bank', { replace: true }))
+    const workspaceId = sessionStorage.getItem(BANK_LINK_WORKSPACE_STORAGE_KEY) ?? undefined;
+    api.bankLink.completeAuthorization(code, state, workspaceId)
+      .then(() => {
+        sessionStorage.removeItem(BANK_LINK_WORKSPACE_STORAGE_KEY);
+        navigate('/bank', { replace: true });
+        if (workspaceId) selectWorkspace(workspaceId);
+      })
       .catch((err: Error) => setError(err.message));
-  }, [params, navigate]);
+  }, [params, navigate, selectWorkspace]);
 
   return (
     <div className="flex flex-col items-center gap-4 py-24 text-center">

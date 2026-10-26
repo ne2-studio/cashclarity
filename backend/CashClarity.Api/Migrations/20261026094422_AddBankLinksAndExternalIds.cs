@@ -22,6 +22,7 @@ namespace CashClarity.Api.Migrations
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    workspace_id = table.Column<Guid>(type: "uuid", nullable: false),
                     user_id = table.Column<string>(type: "text", nullable: false),
                     aspsp_name = table.Column<string>(type: "text", nullable: false),
                     aspsp_country = table.Column<string>(type: "text", nullable: false),
@@ -43,19 +44,25 @@ namespace CashClarity.Api.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_bank_links", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_bank_links_workspaces_workspace_id",
+                        column: x => x.workspace_id,
+                        principalTable: "workspaces",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(
-                name: "bank_movements_user_id_external_id_key",
+                name: "bank_movements_workspace_id_external_id_key",
                 table: "bank_movements",
-                columns: new[] { "user_id", "external_id" },
+                columns: new[] { "workspace_id", "external_id" },
                 unique: true,
                 filter: "external_id IS NOT NULL");
 
             migrationBuilder.CreateIndex(
-                name: "bank_links_user_id_key",
+                name: "bank_links_workspace_id_key",
                 table: "bank_links",
-                column: "user_id",
+                column: "workspace_id",
                 unique: true);
         }
 
@@ -66,7 +73,7 @@ namespace CashClarity.Api.Migrations
                 name: "bank_links");
 
             migrationBuilder.DropIndex(
-                name: "bank_movements_user_id_external_id_key",
+                name: "bank_movements_workspace_id_external_id_key",
                 table: "bank_movements");
 
             migrationBuilder.DropColumn(

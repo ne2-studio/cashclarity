@@ -6,9 +6,9 @@ en lugar de exportar un CSV del banco e importarlo.
 
 ## Modelo
 
-- **Un vínculo bancario por libro.** Hoy el libro es el usuario (`user_id`); cuando existan
-  workspaces, el vínculo pasará a colgar del workspace. Tabla `bank_links`, índice único por
-  `user_id`.
+- **Un vínculo bancario por workspace.** Tabla `bank_links`, índice único por `workspace_id`
+  (se borra en cascada con el workspace). Las rutas cuelgan de
+  `/server/workspaces/{workspaceId}/bank-link` y pasan el filtro de propiedad del workspace.
 - El vínculo guarda banco (`aspsp_name`, `aspsp_country`), tipo de cliente (`psu_type`:
   `personal` | `business`), `session_id`, `valid_until` (caducidad del consentimiento),
   cuenta elegida (`account_uid`, `iban`, `account_name`, `currency`), `sync_from` y
@@ -16,31 +16,32 @@ en lugar de exportar un CSV del banco e importarlo.
 - `session_id` se guarda en claro: sin la clave privada de la aplicación no da acceso a nada.
 - Los movimientos sincronizados son `bank_movements` normales con `external_id` relleno. Llegan
   sin identificar (`is_identified = false`, sin entidad), igual que con la importación CSV.
-  Índice único `(user_id, external_id)` cuando `external_id` no es nulo.
+  Índice único `(workspace_id, external_id)` cuando `external_id` no es nulo.
 
 ## Flujo de vinculación
 
 1. *Extracto Bancario → Vincular banco*: el usuario elige banco (lista de `GET /aspsps?country=ES`),
    tipo de cliente y, opcionalmente, la fecha desde la que sincronizar. Si se deja vacía, se usa
    el día siguiente al último movimiento existente para no solapar con lo importado por CSV.
-2. `POST /server/bank-link/authorizations`: el backend genera un `state` anti-CSRF (caduca en
+2. `POST /server/workspaces/{id}/bank-link/authorizations`: el backend genera un `state` anti-CSRF (caduca en
    30 min), llama a `POST /auth` con `access.valid_until` = mín(máximo del banco, 90 días) y
    devuelve la URL de login del banco.
 3. El banco redirige a `EnableBanking__RedirectUrl` (ruta del frontend `/bank-link/callback`)
-   con `?code&state`. El frontend, autenticado con OIDC, envía ambos a
-   `POST /server/bank-link/sessions`. El backend valida el `state` y crea la sesión
+   con `?code&state`. El frontend, autenticado con OIDC, recupera de `sessionStorage` el
+   workspace que inició la vinculación (por si el activo cambió mientras tanto) y envía ambos a
+   `POST /server/workspaces/{id}/bank-link/sessions`. El backend valida el `state` y crea la sesión
    (`POST /sessions`).
 4. Si la sesión trae una sola cuenta, queda vinculada. Si trae varias, la UI pide elegir
-   (`POST /server/bank-link/account`).
+   (`POST /server/workspaces/{id}/bank-link/account`).
 
 **Renovar o volver a vincular** repite el flujo con el mismo banco. Como los `uid` de cuenta
 cambian en cada sesión, la cuenta se reconoce por IBAN. Si la nueva autorización no incluye ese
 IBAN, se rechaza y la sesión anterior sigue activa. Para cambiar de banco o de cuenta hay que
-desvincular primero (`DELETE /server/bank-link`), que cierra la sesión y conserva los movimientos.
+desvincular primero (`DELETE /server/workspaces/{id}/bank-link`), que cierra la sesión y conserva los movimientos.
 
 ## Sincronización
 
-`POST /server/bank-link/sync` (botón *Sincronizar*):
+`POST /server/workspaces/{id}/bank-link/sync` (botón *Sincronizar*):
 
 - **Rango:** `date_from` = `sync_from` en la primera sync; después, la fecha de la última sync
   menos 7 días (los bancos contabilizan con retraso). El tope es `sync_from`. `date_to` = hoy.

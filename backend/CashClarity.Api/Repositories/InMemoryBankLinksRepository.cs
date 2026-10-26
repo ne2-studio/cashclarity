@@ -7,11 +7,11 @@ public class InMemoryBankLinksRepository : IBankLinksRepository
     private readonly object gate = new();
     private readonly List<BankLink> links = [];
 
-    public Task<BankLink?> GetBankLink(string userId)
+    public Task<BankLink?> GetBankLink(Guid workspaceId)
     {
         lock (gate)
         {
-            var link = links.FirstOrDefault(l => l.UserId == userId);
+            var link = links.FirstOrDefault(l => l.WorkspaceId == workspaceId);
             return Task.FromResult(link is null ? null : Copy(link));
         }
     }
@@ -20,8 +20,8 @@ public class InMemoryBankLinksRepository : IBankLinksRepository
     {
         lock (gate)
         {
-            if (links.Any(l => l.UserId == link.UserId))
-                throw new InvalidOperationException("Bank link already exists for user");
+            if (links.Any(l => l.WorkspaceId == link.WorkspaceId))
+                throw new InvalidOperationException("Bank link already exists for workspace");
             links.Add(Copy(link));
             return Task.CompletedTask;
         }
@@ -31,7 +31,7 @@ public class InMemoryBankLinksRepository : IBankLinksRepository
     {
         lock (gate)
         {
-            var index = links.FindIndex(l => l.Id == link.Id && l.UserId == link.UserId);
+            var index = links.FindIndex(l => l.Id == link.Id && l.WorkspaceId == link.WorkspaceId);
             if (index < 0) throw new NotFoundException("Bank link not found or access denied");
             link.UpdatedAt = DateTime.UtcNow;
             links[index] = Copy(link);
@@ -39,11 +39,11 @@ public class InMemoryBankLinksRepository : IBankLinksRepository
         }
     }
 
-    public Task DeleteBankLink(string userId)
+    public Task DeleteBankLink(Guid workspaceId)
     {
         lock (gate)
         {
-            links.RemoveAll(l => l.UserId == userId);
+            links.RemoveAll(l => l.WorkspaceId == workspaceId);
             return Task.CompletedTask;
         }
     }
@@ -51,6 +51,7 @@ public class InMemoryBankLinksRepository : IBankLinksRepository
     private static BankLink Copy(BankLink link) => new BankLink
     {
         Id = link.Id,
+        WorkspaceId = link.WorkspaceId,
         UserId = link.UserId,
         AspspName = link.AspspName,
         AspspCountry = link.AspspCountry,

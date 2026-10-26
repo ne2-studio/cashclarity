@@ -11,6 +11,7 @@ interface FinanceStore {
   
   // Actions
   fetchData: () => Promise<void>;
+  reset: () => void;
   
   addAccount: (account: Omit<Account, 'id'>) => Promise<Account>;
   updateAccount: (id: string, updates: Partial<Account>) => Promise<void>;
@@ -35,6 +36,8 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
   bankMovements: [],
   isLoading: false,
   error: null,
+
+  reset: () => set({ accounts: [], journalEntries: [], bankMovements: [], error: null }),
 
   fetchData: async () => {
     set({ isLoading: true, error: null });

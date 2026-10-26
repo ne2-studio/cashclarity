@@ -11,6 +11,8 @@ namespace CashClarity.Api.Tests.EnableBanking;
 public class BankLinkServiceTests
 {
     private const string User = "user-a";
+    private static readonly Guid Workspace = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid OtherWorkspace = Guid.Parse("22222222-2222-2222-2222-222222222222");
     private readonly MockEnableBankingApi api = new();
     private readonly FixedTimeProvider clock = new(new DateTimeOffset(2026, 10, 24, 10, 0, 0, TimeSpan.Zero));
     private readonly List<BankMovementResponse> movementsStore = [];
@@ -21,7 +23,7 @@ public class BankLinkServiceTests
     {
         service = new BankLinkService(
             links,
-            new InMemoryBankMovementsRepository(movementsStore),
+            new InMemoryBankMovementsRepository(movementsStore, [], []),
             api.CreateClient(clock),
             clock,
             NullLogger<BankLinkService>.Instance);
@@ -30,7 +32,7 @@ public class BankLinkServiceTests
     [Fact]
     public async Task Linking_an_account_stores_session_account_and_consent_expiry()
     {
-        var start = await service.StartAuthorization(new BankAuthorizationStartRequest("CaixaBank", "ES", "business", "2026-10-01"), User);
+        var start = await service.StartAuthorization(new BankAuthorizationStartRequest("CaixaBank", "ES", "business", "2026-10-01"), User, Workspace);
 
         var auth = api.Requests.Single(r => r.Uri.AbsolutePath == "/auth").JsonBody!;
         Assert.Equal("CaixaBank", auth["aspsp"]!["name"]!.GetValue<string>());
@@ -40,9 +42,9 @@ public class BankLinkServiceTests
         Assert.Equal(clock.Now.AddDays(90), DateTimeOffset.Parse(auth["access"]!["valid_until"]!.GetValue<string>()));
         var state = auth["state"]!.GetValue<string>();
         Assert.Equal($"https://bank.example/login?state={state}", start.Url);
-        Assert.Equal(BankLinkStatus.Pending, (await service.GetBankLink(User)).Status);
+        Assert.Equal(BankLinkStatus.Pending, (await service.GetBankLink(User, Workspace)).Status);
 
-        var link = await service.CompleteAuthorization(new BankAuthorizationCompleteRequest("code-1", state), User);
+        var link = await service.CompleteAuthorization(new BankAuthorizationCompleteRequest("code-1", state), User, Workspace);
 
         Assert.Equal(BankLinkStatus.Active, link.Status);
         Assert.Equal("ES9121000418450200051332", link.Iban);
@@ -54,7 +56,7 @@ public class BankLinkServiceTests
     [Fact]
     public async Task Consent_validity_is_capped_by_the_bank_maximum_and_psd2()
     {
-        await service.StartAuthorization(new BankAuthorizationStartRequest("N26", "ES", "personal"), User);
+        await service.StartAuthorization(new BankAuthorizationStartRequest("N26", "ES", "personal"), User, Workspace);
 
         var auth = api.Requests.Single(r => r.Uri.AbsolutePath == "/auth").JsonBody!;
         Assert.Equal(clock.Now.AddDays(90), DateTimeOffset.Parse(auth["access"]!["valid_until"]!.GetValue<string>()));
@@ -63,18 +65,30 @@ public class BankLinkServiceTests
     [Fact]
     public async Task Completing_with_a_foreign_or_expired_state_is_rejected()
     {
-        await service.StartAuthorization(new BankAuthorizationStartRequest("CaixaBank", "ES", "personal"), User);
+        await service.StartAuthorization(new BankAuthorizationStartRequest("CaixaBank", "ES", "personal"), User, Workspace);
         var state = StateSentToBank();
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.CompleteAuthorization(new BankAuthorizationCompleteRequest("code-1", "forged"), User));
+            service.CompleteAuthorization(new BankAuthorizationCompleteRequest("code-1", "forged"), User, Workspace));
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.CompleteAuthorization(new BankAuthorizationCompleteRequest("code-1", state), "user-b"));
+            service.CompleteAuthorization(new BankAuthorizationCompleteRequest("code-1", state), User, OtherWorkspace));
 
         clock.Now = clock.Now.AddHours(1);
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.CompleteAuthorization(new BankAuthorizationCompleteRequest("code-1", state), User));
+            service.CompleteAuthorization(new BankAuthorizationCompleteRequest("code-1", state), User, Workspace));
         Assert.DoesNotContain(api.Requests, r => r.Uri.AbsolutePath == "/sessions");
+    }
+
+    [Fact]
+    public async Task Each_workspace_has_its_own_link_and_movements()
+    {
+        await LinkAccount(syncFrom: "2026-10-01");
+        api.Transactions = [MockEnableBankingApi.Transaction("ref-1", "2026-10-02", "1500.00", "CRDT", "Nomina octubre")];
+        await service.Sync(User, Workspace);
+
+        Assert.Equal(BankLinkStatus.None, (await service.GetBankLink(User, OtherWorkspace)).Status);
+        await Assert.ThrowsAsync<NotFoundException>(() => service.Sync(User, OtherWorkspace));
+        Assert.All(movementsStore, m => Assert.Equal(Workspace.ToString(), m.WorkspaceId));
     }
 
     [Fact]
@@ -91,8 +105,8 @@ public class BankLinkServiceTests
             MockEnableBankingApi.Transaction("ref-old", "2026-09-20", "99.00", "DBIT", "Antes de la fecha inicial"),
         ];
 
-        var first = await service.Sync(User);
-        var second = await service.Sync(User);
+        var first = await service.Sync(User, Workspace);
+        var second = await service.Sync(User, Workspace);
 
         Assert.Equal(4, first.Created.Count);
         Assert.Equal(0, first.SkippedExisting);
@@ -112,9 +126,9 @@ public class BankLinkServiceTests
     {
         await LinkAccount(syncFrom: "2026-09-01");
 
-        var first = await service.Sync(User);
+        var first = await service.Sync(User, Workspace);
         clock.Now = clock.Now.AddDays(10);
-        var second = await service.Sync(User);
+        var second = await service.Sync(User, Workspace);
 
         Assert.Equal(("2026-09-01", "2026-10-24"), (first.DateFrom, first.DateTo));
         Assert.Equal(("2026-10-17", "2026-11-03"), (second.DateFrom, second.DateTo));
@@ -133,7 +147,7 @@ public class BankLinkServiceTests
             .Select(i => MockEnableBankingApi.Transaction($"ref-{i}", $"2026-10-0{i}", "1.00", "DBIT", $"Movimiento {i}"))
             .ToList();
 
-        var result = await service.Sync(User);
+        var result = await service.Sync(User, Workspace);
 
         Assert.Equal(5, result.Created.Count);
         Assert.Equal(3, api.Requests.Count(r => r.Uri.AbsolutePath.EndsWith("/transactions")));
@@ -142,11 +156,11 @@ public class BankLinkServiceTests
     [Fact]
     public async Task Sync_warns_about_movements_matching_existing_csv_imports()
     {
-        movementsStore.Add(new BankMovementResponse("csv-1", new DateTime(2026, 10, 2, 0, 0, 0, DateTimeKind.Utc), "NOMINA OCT EMPRESA SL", 1500m, false, null, null, User));
+        movementsStore.Add(new BankMovementResponse("csv-1", new DateTime(2026, 10, 2, 0, 0, 0, DateTimeKind.Utc), "NOMINA OCT EMPRESA SL", 1500m, false, null, null, User, Workspace.ToString()));
         await LinkAccount(syncFrom: "2026-10-01");
         api.Transactions = [MockEnableBankingApi.Transaction("ref-1", "2026-10-02", "1500.00", "CRDT", "Nomina octubre")];
 
-        var result = await service.Sync(User);
+        var result = await service.Sync(User, Workspace);
 
         var warning = Assert.Single(result.PossibleDuplicates);
         Assert.Equal("csv-1", warning.ExistingMovementId);
@@ -156,7 +170,7 @@ public class BankLinkServiceTests
     [Fact]
     public async Task Default_sync_from_is_the_day_after_the_latest_existing_movement()
     {
-        movementsStore.Add(new BankMovementResponse("csv-1", new DateTime(2026, 10, 10, 0, 0, 0, DateTimeKind.Utc), "Ultimo CSV", 1m, false, null, null, User));
+        movementsStore.Add(new BankMovementResponse("csv-1", new DateTime(2026, 10, 10, 0, 0, 0, DateTimeKind.Utc), "Ultimo CSV", 1m, false, null, null, User, Workspace.ToString()));
 
         var link = await LinkAccount(syncFrom: null);
 
@@ -170,10 +184,10 @@ public class BankLinkServiceTests
         await LinkAccount(syncFrom: "2026-10-01");
         clock.Now = clock.Now.AddDays(2);
 
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => service.Sync(User));
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => service.Sync(User, Workspace));
 
         Assert.Contains("caducado", error.Message);
-        Assert.Equal(BankLinkStatus.Expired, (await service.GetBankLink(User)).Status);
+        Assert.Equal(BankLinkStatus.Expired, (await service.GetBankLink(User, Workspace)).Status);
     }
 
     [Fact]
@@ -182,7 +196,7 @@ public class BankLinkServiceTests
         await LinkAccount(syncFrom: "2026-10-01");
         api.TransactionsError = "REVOKED_SESSION";
 
-        var error = await Assert.ThrowsAsync<BankProviderException>(() => service.Sync(User));
+        var error = await Assert.ThrowsAsync<BankProviderException>(() => service.Sync(User, Workspace));
 
         Assert.True(error.ConsentInvalid);
         Assert.Equal(400, ApiExceptionHandler.Map(error).Status);
@@ -193,12 +207,12 @@ public class BankLinkServiceTests
     {
         await LinkAccount(syncFrom: "2026-10-01");
         api.Transactions = [MockEnableBankingApi.Transaction("ref-1", "2026-10-02", "1500.00", "CRDT", "Nomina octubre")];
-        await service.Sync(User);
+        await service.Sync(User, Workspace);
 
         api.Accounts = [MockEnableBankingApi.Account("uid-other", "ES7620770024003102575766"), MockEnableBankingApi.Account("uid-2", "ES9121000418450200051332")];
         api.SessionValidUntil = new DateTimeOffset(2027, 4, 1, 0, 0, 0, TimeSpan.Zero);
         var relinked = await LinkAccount(syncFrom: null);
-        var resync = await service.Sync(User);
+        var resync = await service.Sync(User, Workspace);
 
         Assert.Equal(BankLinkStatus.Active, relinked.Status);
         Assert.Equal(new DateTime(2027, 4, 1, 0, 0, 0, DateTimeKind.Utc), relinked.ValidUntil);
@@ -214,11 +228,11 @@ public class BankLinkServiceTests
         await LinkAccount(syncFrom: "2026-10-01");
         api.Accounts = [MockEnableBankingApi.Account("uid-other", "ES7620770024003102575766")];
 
-        await service.StartAuthorization(new BankAuthorizationStartRequest("CaixaBank", "ES", "business"), User);
+        await service.StartAuthorization(new BankAuthorizationStartRequest("CaixaBank", "ES", "business"), User, Workspace);
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.CompleteAuthorization(new BankAuthorizationCompleteRequest("code-2", StateSentToBank()), User));
+            service.CompleteAuthorization(new BankAuthorizationCompleteRequest("code-2", StateSentToBank()), User, Workspace));
 
-        var link = await service.GetBankLink(User);
+        var link = await service.GetBankLink(User, Workspace);
         Assert.Equal(BankLinkStatus.Active, link.Status);
         Assert.Equal("ES9121000418450200051332", link.Iban);
     }
@@ -229,7 +243,7 @@ public class BankLinkServiceTests
         await LinkAccount(syncFrom: "2026-10-01");
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.StartAuthorization(new BankAuthorizationStartRequest("N26", "ES", "personal"), User));
+            service.StartAuthorization(new BankAuthorizationStartRequest("N26", "ES", "personal"), User, Workspace));
     }
 
     [Fact]
@@ -238,8 +252,8 @@ public class BankLinkServiceTests
         api.Accounts = [MockEnableBankingApi.Account("uid-1", "ES9121000418450200051332"), MockEnableBankingApi.Account("uid-2", "ES7620770024003102575766")];
 
         var pending = await LinkAccount(syncFrom: "2026-10-01");
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.Sync(User));
-        var active = await service.SelectAccount(new BankAccountSelectRequest("uid-2"), User);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.Sync(User, Workspace));
+        var active = await service.SelectAccount(new BankAccountSelectRequest("uid-2"), User, Workspace);
 
         Assert.Equal(BankLinkStatus.AwaitingAccount, pending.Status);
         Assert.Equal(2, pending.AccountOptions!.Count);
@@ -253,11 +267,11 @@ public class BankLinkServiceTests
     {
         await LinkAccount(syncFrom: "2026-10-01");
         api.Transactions = [MockEnableBankingApi.Transaction("ref-1", "2026-10-02", "1500.00", "CRDT", "Nomina octubre")];
-        await service.Sync(User);
+        await service.Sync(User, Workspace);
 
-        await service.Unlink(User);
+        await service.Unlink(User, Workspace);
 
-        Assert.Equal(BankLinkStatus.None, (await service.GetBankLink(User)).Status);
+        Assert.Equal(BankLinkStatus.None, (await service.GetBankLink(User, Workspace)).Status);
         Assert.Contains(api.Requests, r => r.Method == HttpMethod.Delete && r.Uri.AbsolutePath == "/sessions/session-1");
         Assert.Single(movementsStore);
     }
@@ -266,15 +280,15 @@ public class BankLinkServiceTests
     public async Task Unsupported_psu_type_is_rejected_before_calling_the_bank()
     {
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.StartAuthorization(new BankAuthorizationStartRequest("N26", "ES", "business"), User));
+            service.StartAuthorization(new BankAuthorizationStartRequest("N26", "ES", "business"), User, Workspace));
 
         Assert.DoesNotContain(api.Requests, r => r.Uri.AbsolutePath == "/auth");
     }
 
     private async Task<BankLinkResponse> LinkAccount(string? syncFrom)
     {
-        await service.StartAuthorization(new BankAuthorizationStartRequest("CaixaBank", "ES", "business", syncFrom), User);
-        return await service.CompleteAuthorization(new BankAuthorizationCompleteRequest("code", StateSentToBank()), User);
+        await service.StartAuthorization(new BankAuthorizationStartRequest("CaixaBank", "ES", "business", syncFrom), User, Workspace);
+        return await service.CompleteAuthorization(new BankAuthorizationCompleteRequest("code", StateSentToBank()), User, Workspace);
     }
 
     private string StateSentToBank() =>

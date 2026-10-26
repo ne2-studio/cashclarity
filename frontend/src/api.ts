@@ -1,4 +1,4 @@
-import { Account, JournalEntry, BankMovement } from './types';
+import { Account, JournalEntry, BankMovement, type Workspace } from './types';
 import { getEnv } from './runtimeConfig';
 
 const API_BASE_URL = (getEnv('VITE_API_URL') || 'http://127.0.0.1:54321/functions/v1/server').replace(/\/$/, '');
@@ -8,6 +8,17 @@ let _accessToken: string | undefined;
 export function setAccessToken(token: string | undefined) {
   _accessToken = token;
 }
+
+let _workspaceId: string | undefined;
+
+export function setActiveWorkspaceId(id: string | undefined) {
+  _workspaceId = id;
+}
+
+const workspaceUrl = (): string => {
+  if (!_workspaceId) throw new Error('No active workspace selected');
+  return `${API_BASE_URL}/workspaces/${_workspaceId}`;
+};
 
 const getHeaders = (): Record<string, string> => ({
   'Content-Type': 'application/json',
@@ -21,29 +32,40 @@ const getMultipartHeaders = (): Record<string, string> => ({
 const handleResponse = async (res: Response) => {
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: 'Unknown error' }));
-    throw new Error(error.error || error.message || `API Error: ${res.status}`);
+    throw new Error(error.message || error.error || `API Error: ${res.status}`);
   }
   return res.json();
 };
 
 export const api = {
+  workspaces: {
+    getAll: async (): Promise<Workspace[]> =>
+      fetch(`${API_BASE_URL}/workspaces`, { headers: getHeaders() }).then(handleResponse),
+    create: async (name: string): Promise<Workspace> =>
+      fetch(`${API_BASE_URL}/workspaces`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ name }),
+      }).then(handleResponse),
+  },
+
   accounts: {
     getAll: async (): Promise<Account[]> =>
-      fetch(`${API_BASE_URL}/accounts`, { headers: getHeaders() }).then(handleResponse).then(data => data.map((a: any) => new Account(a))),
+      fetch(`${workspaceUrl()}/accounts`, { headers: getHeaders() }).then(handleResponse).then(data => data.map((a: any) => new Account(a))),
     create: async (account: Omit<Account, 'id'>): Promise<Account> =>
-      fetch(`${API_BASE_URL}/accounts`, {
+      fetch(`${workspaceUrl()}/accounts`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(account),
       }).then(handleResponse).then(data => new Account(data)),
     update: async (id: string, updates: Partial<Account>): Promise<void> =>
-      fetch(`${API_BASE_URL}/accounts/${id}`, {
+      fetch(`${workspaceUrl()}/accounts/${id}`, {
         method: 'PATCH',
         headers: getHeaders(),
         body: JSON.stringify(updates),
       }).then(handleResponse),
     delete: async (id: string): Promise<void> =>
-      fetch(`${API_BASE_URL}/accounts/${id}`, {
+      fetch(`${workspaceUrl()}/accounts/${id}`, {
         method: 'DELETE',
         headers: getHeaders()
       }).then(handleResponse),
@@ -51,21 +73,21 @@ export const api = {
 
   journalEntries: {
     getAll: async (): Promise<JournalEntry[]> =>
-      fetch(`${API_BASE_URL}/journal-entries`, { headers: getHeaders() }).then(handleResponse).then(data => data.map((e: any) => new JournalEntry(e))),
+      fetch(`${workspaceUrl()}/journal-entries`, { headers: getHeaders() }).then(handleResponse).then(data => data.map((e: any) => new JournalEntry(e))),
     create: async (entry: Omit<JournalEntry, 'id'>): Promise<JournalEntry> =>
-      fetch(`${API_BASE_URL}/journal-entries`, {
+      fetch(`${workspaceUrl()}/journal-entries`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(entry),
       }).then(handleResponse).then(data => new JournalEntry(data)),
     update: async (id: string, updates: Partial<JournalEntry>): Promise<void> =>
-      fetch(`${API_BASE_URL}/journal-entries/${id}`, {
+      fetch(`${workspaceUrl()}/journal-entries/${id}`, {
         method: 'PATCH',
         headers: getHeaders(),
         body: JSON.stringify(updates),
       }).then(handleResponse),
     delete: async (id: string): Promise<void> =>
-      fetch(`${API_BASE_URL}/journal-entries/${id}`, {
+      fetch(`${workspaceUrl()}/journal-entries/${id}`, {
         method: 'DELETE',
         headers: getHeaders()
       }).then(handleResponse),
@@ -73,35 +95,35 @@ export const api = {
 
   bankMovements: {
     getAll: async (): Promise<BankMovement[]> =>
-      fetch(`${API_BASE_URL}/bank-movements`, { headers: getHeaders() }).then(handleResponse).then(data => data.map((m: any) => new BankMovement(m))),
+      fetch(`${workspaceUrl()}/bank-movements`, { headers: getHeaders() }).then(handleResponse).then(data => data.map((m: any) => new BankMovement(m))),
     create: async (movement: Omit<BankMovement, 'id' | 'isIdentified'>): Promise<BankMovement> =>
-      fetch(`${API_BASE_URL}/bank-movements`, {
+      fetch(`${workspaceUrl()}/bank-movements`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(movement),
       }).then(handleResponse).then(data => new BankMovement(data)),
     update: async (id: string, updates: Partial<BankMovement>): Promise<void> =>
-      fetch(`${API_BASE_URL}/bank-movements/${id}`, {
+      fetch(`${workspaceUrl()}/bank-movements/${id}`, {
         method: 'PATCH',
         headers: getHeaders(),
         body: JSON.stringify(updates),
       }).then(handleResponse),
     delete: async (id: string): Promise<void> =>
-      fetch(`${API_BASE_URL}/bank-movements/${id}`, {
+      fetch(`${workspaceUrl()}/bank-movements/${id}`, {
         method: 'DELETE',
         headers: getHeaders()
       }).then(handleResponse),
     previewImport: async (file: File): Promise<BankMovementImportPreview> => {
       const formData = new FormData();
       formData.append('file', file);
-      return fetch(`${API_BASE_URL}/bank-movements/imports/preview`, {
+      return fetch(`${workspaceUrl()}/bank-movements/imports/preview`, {
         method: 'POST',
         headers: getMultipartHeaders(),
         body: formData,
       }).then(handleResponse);
     },
     commitImport: async (rows: BankMovementImportRow[], duplicatePolicy: DuplicatePolicy = 'skip'): Promise<BankMovementImportCommitResult> =>
-      fetch(`${API_BASE_URL}/bank-movements/imports`, {
+      fetch(`${workspaceUrl()}/bank-movements/imports`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify({ rows, duplicatePolicy }),
@@ -113,29 +135,30 @@ export const api = {
 
   bankLink: {
     get: async (): Promise<BankLink> =>
-      fetch(`${API_BASE_URL}/bank-link`, { headers: getHeaders() }).then(handleResponse),
+      fetch(`${workspaceUrl()}/bank-link`, { headers: getHeaders() }).then(handleResponse),
     getAspsps: async (country = 'ES'): Promise<BankAspsp[]> =>
-      fetch(`${API_BASE_URL}/bank-link/aspsps?country=${encodeURIComponent(country)}`, { headers: getHeaders() }).then(handleResponse),
+      fetch(`${workspaceUrl()}/bank-link/aspsps?country=${encodeURIComponent(country)}`, { headers: getHeaders() }).then(handleResponse),
     startAuthorization: async (request: BankAuthorizationStart): Promise<{ url: string }> =>
-      fetch(`${API_BASE_URL}/bank-link/authorizations`, {
+      fetch(`${workspaceUrl()}/bank-link/authorizations`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(request),
       }).then(handleResponse),
-    completeAuthorization: async (code: string, state: string): Promise<BankLink> =>
-      fetch(`${API_BASE_URL}/bank-link/sessions`, {
+    /** workspaceId: el workspace que inició la vinculación, por si el activo cambió mientras el usuario estaba en el banco. */
+    completeAuthorization: async (code: string, state: string, workspaceId?: string): Promise<BankLink> =>
+      fetch(`${workspaceId ? `${API_BASE_URL}/workspaces/${workspaceId}` : workspaceUrl()}/bank-link/sessions`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify({ code, state }),
       }).then(handleResponse),
     selectAccount: async (accountUid: string): Promise<BankLink> =>
-      fetch(`${API_BASE_URL}/bank-link/account`, {
+      fetch(`${workspaceUrl()}/bank-link/account`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify({ accountUid }),
       }).then(handleResponse),
     sync: async (): Promise<BankSyncResult> =>
-      fetch(`${API_BASE_URL}/bank-link/sync`, {
+      fetch(`${workspaceUrl()}/bank-link/sync`, {
         method: 'POST',
         headers: getHeaders(),
       }).then(handleResponse).then(data => ({
@@ -143,7 +166,7 @@ export const api = {
         created: data.created.map((m: any) => new BankMovement(m)),
       })),
     unlink: async (): Promise<void> =>
-      fetch(`${API_BASE_URL}/bank-link`, {
+      fetch(`${workspaceUrl()}/bank-link`, {
         method: 'DELETE',
         headers: getHeaders(),
       }).then(handleResponse),

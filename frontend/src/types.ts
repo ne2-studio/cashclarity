@@ -93,3 +93,9 @@ export class BankMovement {
     this.externalId = data.externalId;
   }
 }
+
+export interface Workspace {
+  id: string;
+  name: string;
+  createdAt: string;
+}
