@@ -13,3 +13,5 @@
 
 Sincronización bancaria (Enable Banking): configuración, secretos y diseño en
 [`docs/operations/enable-banking.md`](../docs/operations/enable-banking.md).
+
+Servidor MCP (`/mcp`): ver [`docs/operations/mcp.md`](../docs/operations/mcp.md).

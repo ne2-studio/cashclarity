@@ -86,6 +86,34 @@ npm run dev
 
 The app starts on `http://localhost:3000`.
 
+## Servidor MCP
+
+La API expone un servidor MCP en `/mcp` (HTTP streamable). Se autentica con el mismo login OIDC que
+la web, y cada endpoint REST tiene su tool:
+
+| Endpoint REST | Tool MCP | Tipo |
+|---|---|---|
+| `GET /server/health` | `health_check` | lectura |
+| `GET /server/workspaces` | `list_workspaces` | lectura |
+| `POST /server/workspaces` | `create_workspace` | escritura |
+| `GET /server/workspaces/{workspaceId}/accounts` | `list_accounts` | lectura |
+| `POST /server/workspaces/{workspaceId}/accounts` | `create_account` | escritura |
+| `PATCH /server/workspaces/{workspaceId}/accounts/{id}` | `update_account` | escritura |
+| `DELETE /server/workspaces/{workspaceId}/accounts/{id}` | `delete_account` | destructiva |
+| `GET /server/workspaces/{workspaceId}/journal-entries` | `list_journal_entries` | lectura |
+| `POST /server/workspaces/{workspaceId}/journal-entries` | `create_journal_entry` | escritura |
+| `PATCH /server/workspaces/{workspaceId}/journal-entries/{id}` | `update_journal_entry` | destructiva (sustituye líneas) |
+| `DELETE /server/workspaces/{workspaceId}/journal-entries/{id}` | `delete_journal_entry` | destructiva |
+| `GET /server/workspaces/{workspaceId}/bank-movements` | `list_bank_movements` | lectura |
+| `POST /server/workspaces/{workspaceId}/bank-movements` | `create_bank_movement` | escritura |
+| `PATCH /server/workspaces/{workspaceId}/bank-movements/{id}` | `update_bank_movement` | escritura |
+| `DELETE /server/workspaces/{workspaceId}/bank-movements/{id}` | `delete_bank_movement` | destructiva |
+| `POST /server/workspaces/{workspaceId}/bank-movements/imports/preview` | `preview_bank_movement_import` | lectura (`csvText` o `fileBase64`) |
+| `POST /server/workspaces/{workspaceId}/bank-movements/imports` | `commit_bank_movement_import` | escritura |
+
+- Registro en Claude Code y alta del Client ID en Zitadel: [`docs/user/mcp-claude-code.md`](docs/user/mcp-claude-code.md)
+- Diseño, configuración y tests: [`docs/operations/mcp.md`](docs/operations/mcp.md)
+
 ## Environment variables
 
 ### Frontend (`frontend/.env`)
@@ -101,6 +129,7 @@ The app starts on `http://localhost:3000`.
 | `ConnectionStrings:DefaultConnection` | PostgreSQL connection string |
 | `Auth:Authority` | OIDC authority URL |
 | `Auth:Audience` | Expected JWT audience |
+| `Mcp:ResourceUrl` | Public URL of the MCP endpoint (`https://<api-host>/mcp`), recommended behind a proxy |
 
 ## Deployment
 
