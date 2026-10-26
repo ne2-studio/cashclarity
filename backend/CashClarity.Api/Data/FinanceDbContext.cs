@@ -10,6 +10,7 @@ public class FinanceDbContext(DbContextOptions<FinanceDbContext> options) : DbCo
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalLine> JournalLines => Set<JournalLine>();
     public DbSet<BankMovement> BankMovements => Set<BankMovement>();
+    public DbSet<BankLink> BankLinks => Set<BankLink>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -116,6 +117,7 @@ public class FinanceDbContext(DbContextOptions<FinanceDbContext> options) : DbCo
             e.Property(bm => bm.JournalEntryId).HasColumnName("journal_entry_id");
             e.Property(bm => bm.WorkspaceId).HasColumnName("workspace_id");
             e.Property(bm => bm.UserId).HasColumnName("user_id");
+            e.Property(bm => bm.ExternalId).HasColumnName("external_id");
             e.Property(bm => bm.CreatedAt).HasColumnName("created_at")
                 .HasColumnType("timestamp with time zone")
                 .HasDefaultValueSql("timezone('utc'::text, now())");
@@ -133,6 +135,45 @@ public class FinanceDbContext(DbContextOptions<FinanceDbContext> options) : DbCo
             e.HasIndex(bm => bm.WorkspaceId).HasDatabaseName("idx_bank_movements_workspace_id");
             e.HasIndex(bm => bm.EntityId).HasDatabaseName("idx_bank_movements_entity_id");
             e.HasIndex(bm => bm.JournalEntryId).HasDatabaseName("idx_bank_movements_journal_entry_id");
+            e.HasIndex(bm => new { bm.WorkspaceId, bm.ExternalId }).IsUnique()
+                .HasFilter("external_id IS NOT NULL")
+                .HasDatabaseName("bank_movements_workspace_id_external_id_key");
+        });
+
+        mb.Entity<BankLink>(e =>
+        {
+            e.ToTable("bank_links");
+            e.Property(bl => bl.Id).HasColumnName("id").HasDefaultValueSql("gen_random_uuid()");
+            e.Property(bl => bl.WorkspaceId).HasColumnName("workspace_id");
+            e.Property(bl => bl.UserId).HasColumnName("user_id");
+            e.Property(bl => bl.AspspName).HasColumnName("aspsp_name");
+            e.Property(bl => bl.AspspCountry).HasColumnName("aspsp_country");
+            e.Property(bl => bl.PsuType).HasColumnName("psu_type");
+            e.Property(bl => bl.SyncFrom).HasColumnName("sync_from");
+            e.Property(bl => bl.PendingState).HasColumnName("pending_state");
+            e.Property(bl => bl.PendingStateExpiresAt).HasColumnName("pending_state_expires_at")
+                .HasColumnType("timestamp with time zone");
+            e.Property(bl => bl.SessionId).HasColumnName("session_id");
+            e.Property(bl => bl.ValidUntil).HasColumnName("valid_until")
+                .HasColumnType("timestamp with time zone");
+            e.Property(bl => bl.AccountOptionsJson).HasColumnName("account_options").HasColumnType("jsonb");
+            e.Property(bl => bl.AccountUid).HasColumnName("account_uid");
+            e.Property(bl => bl.Iban).HasColumnName("iban");
+            e.Property(bl => bl.AccountName).HasColumnName("account_name");
+            e.Property(bl => bl.Currency).HasColumnName("currency");
+            e.Property(bl => bl.LastSyncedAt).HasColumnName("last_synced_at")
+                .HasColumnType("timestamp with time zone");
+            e.Property(bl => bl.CreatedAt).HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .HasDefaultValueSql("timezone('utc'::text, now())");
+            e.Property(bl => bl.UpdatedAt).HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .HasDefaultValueSql("timezone('utc'::text, now())");
+
+            e.HasOne<Workspace>().WithMany()
+                .HasForeignKey(bl => bl.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(bl => bl.WorkspaceId).IsUnique().HasDatabaseName("bank_links_workspace_id_key");
         });
     }
 }

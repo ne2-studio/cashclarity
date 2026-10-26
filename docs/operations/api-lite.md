@@ -24,3 +24,6 @@ Notes:
   (`/server/workspaces/{workspaceId}/...`); a user must create a workspace first.
 - State lasts for the container process lifetime.
 - Frontend acceptance uses it through `docker-compose.lite.yml`.
+- Enable Banking se simula con `FakeEnableBankingClient`: vincular vuelve directamente a
+  `/bank-link/callback` y la sync devuelve tres movimientos fijos. Ver
+  [`enable-banking.md`](enable-banking.md).

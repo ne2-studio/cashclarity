@@ -71,6 +71,56 @@ describe('api client', () => {
     );
   });
 
+  it('surfaces backend error messages from the error field', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ error: 'El consentimiento bancario ha caducado.' }), { status: 400 }));
+
+    await expect(api.bankLink.sync()).rejects.toThrow('El consentimiento bancario ha caducado.');
+  });
+
+  it('syncs the bank link and maps created movements', async () => {
+    setAccessToken('token-1');
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      created: [{ id: 'm1', date: '2026-10-20', description: 'Nomina', amount: 1500, isIdentified: false, externalId: 'ref:1' }],
+      skippedExisting: 2,
+      possibleDuplicates: [],
+      dateFrom: '2026-10-01',
+      dateTo: '2026-10-24',
+      balance: null,
+      link: { configured: true, status: 'active' },
+    })));
+
+    const result = await api.bankLink.sync();
+
+    expect(result.created[0].externalId).toBe('ref:1');
+    expect(result.skippedExisting).toBe(2);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:54321/functions/v1/server/workspaces/ws-1/bank-link/sync',
+      { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer token-1' } },
+    );
+  });
+
+  it('completes the bank authorization with code and state', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ configured: true, status: 'active' })));
+
+    await api.bankLink.completeAuthorization('code-1', 'state-1');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:54321/functions/v1/server/workspaces/ws-1/bank-link/sessions',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ code: 'code-1', state: 'state-1' }) }),
+    );
+  });
+
+  it('completes the bank authorization in the workspace that started it', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ configured: true, status: 'active' })));
+
+    await api.bankLink.completeAuthorization('code-1', 'state-1', 'ws-9');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:54321/functions/v1/server/workspaces/ws-9/bank-link/sessions',
+      expect.anything(),
+    );
+  });
+
   it('lists and creates workspaces without needing an active workspace', async () => {
     setActiveWorkspaceId(undefined);
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(

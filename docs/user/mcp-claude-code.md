@@ -83,7 +83,7 @@ claude mcp add --transport http \
 1. Abre Claude Code y ejecuta `/mcp`.
 2. Selecciona `cashclarity` → **Authenticate**.
 3. Se abre el navegador con el login de CashClarity (Zitadel). Entra con tu usuario habitual.
-4. Vuelve a Claude Code. `cashclarity` debe aparecer como *connected* con 17 tools.
+4. Vuelve a Claude Code. `cashclarity` debe aparecer como *connected* con 24 tools.
 
 Prueba rápida: pide a Claude *"lista mis espacios de CashClarity y dime cuánto tengo comprometido"*.
 Claude primero llamará a `list_workspaces`; si tienes varios workspaces, dile cuál usar.
