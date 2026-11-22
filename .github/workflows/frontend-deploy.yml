@@ -1,9 +1,11 @@
 name: Frontend CI/CD
 
+# Tests + aceptación en cada cambio; despliegue en Cloudflare Pages (proyecto cashclarity-frontend):
+# push a main -> producción (cashclarity-frontend.ne2.studio); PR -> preview en <rama>.cashclarity-frontend.pages.dev.
 on:
   push:
     branches:
-      - '**'
+      - main
     paths:
       - '.github/workflows/frontend-deploy.yml'
       - '.github/actions/**'
@@ -30,7 +32,8 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
-  IMAGE_NAME: ghcr.io/ne2-studio/cashclarity-frontend
+  # Imagen local solo para la aceptación (docker-compose.lite.yml); ya no se publica ni se despliega.
+  IMAGE_NAME: cashclarity-frontend:ci
 
 jobs:
   build:
@@ -63,21 +66,16 @@ jobs:
           artifact-name: frontend-coverage-report
           artifact-path: frontend/coverage
 
-      - name: Build Vite app for image
+      - name: Build Vite app for acceptance image
         working-directory: frontend
         run: npm run build
 
-      - name: Package frontend image
+      - name: Package acceptance frontend image
         uses: ./.github/actions/docker-build-image
         with:
-          image: ${{ env.IMAGE_NAME }}:latest
+          image: ${{ env.IMAGE_NAME }}
           context: frontend
           cache-scope: frontend-app
-
-      - name: Scan frontend image
-        uses: ./.github/actions/scan-image
-        with:
-          image: ${{ env.IMAGE_NAME }}:latest
 
       - name: Package acceptance API image
         uses: ./.github/actions/docker-build-image
@@ -89,7 +87,7 @@ jobs:
 
       - name: Verify frontend acceptance
         env:
-          FRONTEND_IMAGE: ${{ env.IMAGE_NAME }}:latest
+          FRONTEND_IMAGE: ${{ env.IMAGE_NAME }}
           API_LITE_IMAGE: cashclarity-api-lite:ci
           KEEP_VERIFY_IMAGES: "1"
         run: ./scripts/verify --skip-image-build frontend-acceptance
@@ -104,11 +102,13 @@ jobs:
 
   deploy:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Los PRs desde forks no tienen acceso a los secrets.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      deployments: write
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
@@ -120,23 +120,35 @@ jobs:
         with:
           working-directory: frontend
 
-      - name: Build Vite app for image
+      - name: Build Vite app
         working-directory: frontend
         run: npm run build
 
-      - name: Release frontend image
-        uses: ./.github/actions/release-ghcr-image
-        with:
-          image: ${{ env.IMAGE_NAME }}
-          context: frontend
-          cache-scope: frontend-app
-          sha: ${{ github.sha }}
-          username: ${{ github.actor }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+      # Equivalente a lo que hacía el contenedor nginx al arrancar: en Coolify solo
+      # estaba definida VITE_API_URL; el resto quedan vacías.
+      - name: Generate runtime env-config.js
+        working-directory: frontend
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: |
+          envsubst '${VITE_API_URL} ${VITE_AUTH_DISABLED} ${VITE_OIDC_AUTHORITY} ${VITE_OIDC_CLIENT_ID} ${VITE_OIDC_CALLBACK_URI} ${VITE_OIDC_LOGOUT_REDIRECT_URI}' \
+            < dist/env-config.template.js > dist/env-config.js
+          # Sin 404.html Pages sirve index.html en las rutas de la SPA.
+          rm -f dist/404.html
 
-      - name: Deploy frontend
-        uses: ./.github/actions/deploy-coolify
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
         with:
-          service: frontend
-          webhook: ${{ vars.COOLIFY_WEBHOOK_FRONTEND }}
-          token: ${{ secrets.COOLIFY_API_TOKEN }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: frontend
+          command: pages deploy dist --project-name=cashclarity-frontend --branch=${{ github.head_ref || github.ref_name }}
+
+      - name: Comment preview URL
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          URL: ${{ steps.deploy.outputs.pages-deployment-alias-url || steps.deploy.outputs.deployment-url }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --edit-last --create-if-none --body "Preview frontend: $URL"

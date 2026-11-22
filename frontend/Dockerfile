@@ -1,3 +1,5 @@
+# Test-only image: frontend acceptance tests and scripts/run-env (docker-compose.lite.yml).
+# Production is served by Cloudflare Pages, see .github/workflows/frontend-deploy.yml.
 FROM nginx:alpine
 
 # Refresh Alpine packages so the base image doesn't ship stale, patched CVEs
