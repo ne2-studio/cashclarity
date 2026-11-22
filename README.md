@@ -133,15 +133,21 @@ la web, y cada endpoint REST tiene su tool:
 
 ## Deployment
 
-Both services are containerized. CI/CD runs on push to `main`, delegates checks to
-`./scripts/verify`, validates packaged images, pushes to GitHub Container Registry,
-and triggers Coolify deploy webhooks.
+CI/CD delegates checks to `./scripts/verify`.
+
+- **Backend**: containerized. On push to `main` the image is validated, pushed to
+  GitHub Container Registry, and deployed through a Coolify webhook.
+- **Frontend**: static site on Cloudflare Pages (project `cashclarity-frontend`,
+  https://cashclarity-frontend.ne2.studio). On push to `main` CI builds `dist/`,
+  renders `env-config.js` with the `VITE_API_URL` repo variable, and publishes it
+  with `wrangler pages deploy`. Each PR gets a preview at
+  `<branch>.cashclarity-frontend.pages.dev`, commented on the PR.
 
 ```bash
 # Build backend image
 docker build -t cashclarity-backend ./backend
 
-# Build frontend image (requires a prior npm run build)
+# Frontend image, used only by acceptance tests and scripts/run-env (requires a prior npm run build)
 cd frontend && npm run build
 docker build -t cashclarity-frontend ./frontend
 ```

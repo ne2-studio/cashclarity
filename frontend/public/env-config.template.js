@@ -1,4 +1,6 @@
-// Rendered into env-config.js by docker-entrypoint.d/95-generate-runtime-env.sh.
+// Rendered into env-config.js with envsubst: by the deploy job in
+// .github/workflows/frontend-deploy.yml (Cloudflare Pages) and, for acceptance
+// tests, by docker-entrypoint.d/95-generate-runtime-env.sh.
 window.__ENV__ = {
   VITE_API_URL: "${VITE_API_URL}",
   VITE_AUTH_DISABLED: "${VITE_AUTH_DISABLED}",
