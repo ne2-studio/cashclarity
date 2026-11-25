@@ -39,3 +39,7 @@ staging and commit message selection.
 
 Use the `verify` skill and run the narrowest matching `./scripts/verify`
 command. Verification must succeed to consider the task done.
+
+## Issues
+
+Project CASH in YouTrack (MCP `youtrack-ne2`). Before reading, writing or refining an issue, see `~/Projects/ne2-studio/infra/docs/issue-tracking.md`.
