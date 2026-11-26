@@ -79,6 +79,34 @@ public class InMemoryBankMovementsRepository : IBankMovementsRepository
         }
     }
 
+    public Task<List<BankMovementResponse>> AddSyncedBankMovements(List<SyncedBankMovementCreate> movements, string userId, Guid workspaceId)
+    {
+        var ws = workspaceId.ToString();
+        lock (gate)
+        {
+            var known = bankMovements
+                .Where(m => m.WorkspaceId == ws && m.ExternalId is not null)
+                .Select(m => m.ExternalId!)
+                .ToHashSet();
+            var created = movements
+                .Where(m => known.Add(m.ExternalId))
+                .Select(m => new BankMovementResponse(
+                    Guid.NewGuid().ToString(),
+                    m.Date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
+                    m.Description,
+                    m.Amount,
+                    false,
+                    null,
+                    null,
+                    userId,
+                    ws,
+                    m.ExternalId))
+                .ToList();
+            bankMovements.AddRange(created);
+            return Task.FromResult(created);
+        }
+    }
+
     public Task UpdateBankMovement(string id, BankMovementPatchRequest patch, string userId, Guid workspaceId)
     {
         var ws = workspaceId.ToString();

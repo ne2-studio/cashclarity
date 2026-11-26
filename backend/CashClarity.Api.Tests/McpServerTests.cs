@@ -8,6 +8,8 @@ using CashClarity.Api.Controllers;
 using CashClarity.Api.Mcp;
 using CashClarity.Api.Repositories;
 using CashClarity.Api.Services;
+using CashClarity.Api.Services.EnableBanking;
+using CashClarity.Api.Tests.EnableBanking;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -30,6 +32,7 @@ public sealed class McpServerTests : IAsyncLifetime
 {
     private const string Authority = "https://auth.example.test";
     private WebApplication app = null!;
+    private readonly MockEnableBankingApi bankApi = new();
 
     public async Task InitializeAsync()
     {
@@ -46,6 +49,11 @@ public sealed class McpServerTests : IAsyncLifetime
         builder.Services.AddSingleton<IJournalEntriesRepository>(new InMemoryJournalEntriesRepository(accounts, journalEntries, bankMovements));
         builder.Services.AddSingleton<IBankMovementsRepository>(new InMemoryBankMovementsRepository(bankMovements, accounts, journalEntries));
         builder.Services.AddSingleton<IBankMovementImportService, BankMovementImportService>();
+        var clock = new FixedTimeProvider(new DateTimeOffset(2026, 10, 24, 10, 0, 0, TimeSpan.Zero));
+        builder.Services.AddSingleton<IBankLinksRepository, InMemoryBankLinksRepository>();
+        builder.Services.AddSingleton<IEnableBankingClient>(bankApi.CreateClient(clock));
+        builder.Services.AddSingleton<TimeProvider>(clock);
+        builder.Services.AddSingleton<IBankLinkService, BankLinkService>();
         builder.Services.AddCashClarityMcp();
         builder.Services
             .AddAuthentication(options =>
@@ -77,8 +85,8 @@ public sealed class McpServerTests : IAsyncLifetime
             .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Static))
             .Count(m => m.GetCustomAttribute<McpServerToolAttribute>() is not null);
 
-        Assert.Equal(17, app.Services.GetServices<McpServerTool>().Count());
-        Assert.Equal(17, endpoints);
+        Assert.Equal(24, app.Services.GetServices<McpServerTool>().Count());
+        Assert.Equal(24, endpoints);
         Assert.Equal(endpoints, tools);
     }
 
@@ -91,10 +99,12 @@ public sealed class McpServerTests : IAsyncLifetime
 
         Assert.Equal(
             [
-                "commit_bank_movement_import", "create_account", "create_bank_movement", "create_journal_entry",
-                "create_workspace", "delete_account", "delete_bank_movement", "delete_journal_entry", "health_check",
-                "list_accounts", "list_bank_movements", "list_journal_entries", "list_workspaces",
-                "preview_bank_movement_import", "update_account", "update_bank_movement", "update_journal_entry",
+                "commit_bank_movement_import", "complete_bank_authorization", "create_account", "create_bank_movement",
+                "create_journal_entry", "create_workspace", "delete_account", "delete_bank_movement", "delete_journal_entry",
+                "get_bank_link", "health_check", "list_accounts", "list_bank_aspsps", "list_bank_movements",
+                "list_journal_entries", "list_workspaces", "preview_bank_movement_import", "select_bank_account",
+                "start_bank_authorization", "sync_bank_link", "unlink_bank", "update_account", "update_bank_movement",
+                "update_journal_entry",
             ],
             tools.Select(t => t.Name).Order());
         var createAccountSchema = tools.Single(t => t.Name == "create_account").JsonSchema.GetRawText();
@@ -185,6 +195,32 @@ public sealed class McpServerTests : IAsyncLifetime
         Assert.Equal(2, commit.GetProperty("created").GetArrayLength());
         Assert.Equal(2, movements.Count);
         Assert.Contains(movements, m => m.GetProperty("description").GetString() == "Cafe" && m.GetProperty("isIdentified").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Bank_account_can_be_linked_synced_twice_and_unlinked_through_tools()
+    {
+        await using var client = await Connect("user-a");
+        var ws = await CreateWorkspace(client);
+        bankApi.Transactions = [MockEnableBankingApi.Transaction("ref-1", "2026-10-20", "1500.00", "CRDT", "Nomina octubre")];
+
+        var banks = await Call(client, "list_bank_aspsps", new() { ["workspaceId"] = ws, ["country"] = "ES" });
+        await Call(client, "start_bank_authorization", new()
+        {
+            ["workspaceId"] = ws, ["aspspName"] = "CaixaBank", ["aspspCountry"] = "ES", ["psuType"] = "business", ["syncFrom"] = "2026-10-01",
+        });
+        var state = bankApi.Requests.Last(r => r.Uri.AbsolutePath == "/auth").JsonBody!["state"]!.GetValue<string>();
+        var link = await Call(client, "complete_bank_authorization", new() { ["workspaceId"] = ws, ["code"] = "code-1", ["state"] = state });
+        var first = await Call(client, "sync_bank_link", new() { ["workspaceId"] = ws });
+        var second = await Call(client, "sync_bank_link", new() { ["workspaceId"] = ws });
+        await Call(client, "unlink_bank", new() { ["workspaceId"] = ws });
+
+        Assert.Contains(banks.EnumerateArray(), b => b.GetProperty("name").GetString() == "CaixaBank");
+        Assert.Equal("active", link.GetProperty("status").GetString());
+        Assert.Equal(1, first.GetProperty("created").GetArrayLength());
+        Assert.Equal(0, second.GetProperty("created").GetArrayLength());
+        Assert.Single((await Call(client, "list_bank_movements", new() { ["workspaceId"] = ws })).EnumerateArray());
+        Assert.Equal("none", (await Call(client, "get_bank_link", new() { ["workspaceId"] = ws })).GetProperty("status").GetString());
     }
 
     [Fact]

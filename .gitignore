@@ -1,3 +1,8 @@
 el-baul
 tmp/
 .ne2-factory/database*
+
+# Secretos (p. ej. clave privada de Enable Banking): nunca en el repo
+*.pem
+*.key
+secrets/

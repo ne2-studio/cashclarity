@@ -184,3 +184,35 @@ test('CSV import previews and imports bank movements', async ({ page }, testInfo
 
   assertNoBrowserErrors();
 });
+
+// Va al final del fichero: los movimientos sincronizados alterarían los saldos que comprueban los journeys anteriores.
+test('bank account can be linked and synced twice without duplicating movements', async ({ page }, testInfo) => {
+  const assertNoBrowserErrors = collectUnexpectedBrowserErrors(page, testInfo);
+  await loginAsAcceptanceUser(page);
+
+  await openNav(page, 'Extracto Bancario');
+  const panel = page.getByTestId('bank-link-panel');
+  await panel.getByRole('button', { name: 'Vincular banco' }).click();
+  await page.getByLabel('Banco').selectOption('CaixaBank');
+  await page.getByLabel('Tipo de cliente').selectOption('business');
+  await page.getByLabel('Sincronizar desde').fill('2026-01-01');
+  await page.getByRole('button', { name: 'Ir al banco' }).click();
+
+  await page.waitForURL(/\/bank-link\/callback\?code=/);
+  await page.waitForURL(/\/bank$/);
+  await expect(panel).toContainText('CaixaBank');
+  await expect(panel).toContainText('ES91 •••• 1332');
+  await expect(panel).toContainText('Consentimiento hasta');
+
+  await panel.getByRole('button', { name: 'Sincronizar' }).click();
+  await expect(page.getByTestId('bank-sync-result')).toContainText('3 movimientos nuevos · 0 ya existentes');
+  await panel.getByRole('button', { name: 'Sincronizar' }).click();
+  await expect(page.getByTestId('bank-sync-result')).toContainText('0 movimientos nuevos · 3 ya existentes');
+
+  for (const concept of ['Nomina empresa', 'Supermercado', 'Suscripcion musica']) {
+    await expect(page.locator('tbody tr', { hasText: concept })).toHaveCount(1);
+  }
+  await expect(page.locator('tbody tr', { hasText: 'Supermercado' })).toContainText(cashText(-42.3));
+
+  assertNoBrowserErrors();
+});

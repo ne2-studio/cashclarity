@@ -10,6 +10,9 @@ public interface IBankMovementsRepository
     Task<List<BankMovementResponse>> GetBankMovements(string userId, Guid workspaceId);
     Task<BankMovementResponse> AddBankMovement(BankMovementCreateRequest req, string userId, Guid workspaceId);
     Task<List<BankMovementResponse>> AddBankMovements(List<BankMovementCreateRequest> requests, string userId, Guid workspaceId);
+
+    /// <summary>Inserta los movimientos cuyo ExternalId aún no existe en el workspace y devuelve solo los creados.</summary>
+    Task<List<BankMovementResponse>> AddSyncedBankMovements(List<SyncedBankMovementCreate> movements, string userId, Guid workspaceId);
     Task UpdateBankMovement(string id, BankMovementPatchRequest patch, string userId, Guid workspaceId);
     Task DeleteBankMovement(string id, string userId, Guid workspaceId);
 }
@@ -65,6 +68,34 @@ public class BankMovementsRepository(FinanceDbContext db) : IBankMovementsReposi
         return movements.Select(MapBankMovement).ToList();
     }
 
+    public async Task<List<BankMovementResponse>> AddSyncedBankMovements(List<SyncedBankMovementCreate> movements, string userId, Guid workspaceId)
+    {
+        var candidateIds = movements.Select(m => m.ExternalId).ToList();
+        var existingIds = await db.BankMovements
+            .Where(bm => bm.WorkspaceId == workspaceId && bm.ExternalId != null && candidateIds.Contains(bm.ExternalId))
+            .Select(bm => bm.ExternalId!)
+            .ToListAsync();
+        var known = existingIds.ToHashSet();
+
+        var created = movements
+            .Where(m => known.Add(m.ExternalId))
+            .Select(m => new BankMovement
+            {
+                Date = m.Date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
+                Description = m.Description,
+                Amount = m.Amount,
+                IsIdentified = false,
+                UserId = userId,
+                WorkspaceId = workspaceId,
+                ExternalId = m.ExternalId,
+            })
+            .ToList();
+
+        db.BankMovements.AddRange(created);
+        await db.SaveChangesAsync();
+        return created.Select(MapBankMovement).ToList();
+    }
+
     public async Task UpdateBankMovement(string id, BankMovementPatchRequest patch, string userId, Guid workspaceId)
     {
         var movement = await db.BankMovements
@@ -105,7 +136,7 @@ public class BankMovementsRepository(FinanceDbContext db) : IBankMovementsReposi
 
     private static BankMovementResponse MapBankMovement(BankMovement bm) =>
         new(bm.Id.ToString(), bm.Date, bm.Description, bm.Amount, bm.IsIdentified,
-            bm.EntityId, bm.JournalEntryId?.ToString(), bm.UserId, bm.WorkspaceId.ToString());
+            bm.EntityId, bm.JournalEntryId?.ToString(), bm.UserId, bm.WorkspaceId.ToString(), bm.ExternalId);
 
     private static DateTime ParseDate(string date) =>
         DateTime.Parse(date, null,

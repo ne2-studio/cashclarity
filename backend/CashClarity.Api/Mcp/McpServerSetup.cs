@@ -60,6 +60,7 @@ public static class McpServerSetup
         typeof(AccountsTools),
         typeof(JournalEntriesTools),
         typeof(BankMovementsTools),
+        typeof(BankLinkTools),
     ];
 
     /// <summary>

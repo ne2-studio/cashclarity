@@ -3,6 +3,7 @@ using CashClarity.Api.Contracts;
 using CashClarity.Api.Lite;
 using CashClarity.Api.Repositories;
 using CashClarity.Api.Services;
+using CashClarity.Api.Services.EnableBanking;
 using Microsoft.AspNetCore.Authentication;
 using Serilog;
 
@@ -40,6 +41,10 @@ builder.Services.AddSingleton<IBankMovementsRepository>(services =>
         services.GetRequiredService<List<AccountResponse>>(),
         services.GetRequiredService<List<JournalEntryResponse>>()));
 builder.Services.AddSingleton<IBankMovementImportService, BankMovementImportService>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<IBankLinksRepository, InMemoryBankLinksRepository>();
+builder.Services.AddSingleton<IEnableBankingClient, FakeEnableBankingClient>();
+builder.Services.AddSingleton<IBankLinkService, BankLinkService>();
 builder.Services.AddControllers().AddApplicationPart(typeof(AccountsController).Assembly);
 builder.Services.AddExceptionHandler<CashClarity.Api.ApiExceptionHandler>();
 builder.Services.AddProblemDetails();

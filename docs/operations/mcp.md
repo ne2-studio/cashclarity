@@ -52,6 +52,13 @@ Manual de usuario (Zitadel + Claude Code): [`docs/user/mcp-claude-code.md`](../u
 | `DELETE /server/workspaces/{workspaceId}/bank-movements/{id}` | `delete_bank_movement` | destructiva |
 | `POST /server/workspaces/{workspaceId}/bank-movements/imports/preview` | `preview_bank_movement_import` | lectura (`csvText` o `fileBase64`) |
 | `POST /server/workspaces/{workspaceId}/bank-movements/imports` | `commit_bank_movement_import` | escritura |
+| `GET /server/workspaces/{workspaceId}/bank-link` | `get_bank_link` | lectura |
+| `GET /server/workspaces/{workspaceId}/bank-link/aspsps` | `list_bank_aspsps` | lectura (Enable Banking) |
+| `POST /server/workspaces/{workspaceId}/bank-link/authorizations` | `start_bank_authorization` | escritura (devuelve la URL de login del banco) |
+| `POST /server/workspaces/{workspaceId}/bank-link/sessions` | `complete_bank_authorization` | escritura |
+| `POST /server/workspaces/{workspaceId}/bank-link/account` | `select_bank_account` | escritura |
+| `POST /server/workspaces/{workspaceId}/bank-link/sync` | `sync_bank_link` | escritura idempotente |
+| `DELETE /server/workspaces/{workspaceId}/bank-link` | `unlink_bank` | destructiva (conserva movimientos) |
 
 Espacios (huchas), entidades y saldo comprometido no tienen endpoint propio. Son cuentas con
 `type` `space` o `entity`, y el saldo se deriva de los asientos. La descripción de `list_accounts`

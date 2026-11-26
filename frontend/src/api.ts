@@ -132,7 +132,96 @@ export const api = {
         created: data.created.map((m: any) => new BankMovement(m)),
       })),
   },
+
+  bankLink: {
+    get: async (): Promise<BankLink> =>
+      fetch(`${workspaceUrl()}/bank-link`, { headers: getHeaders() }).then(handleResponse),
+    getAspsps: async (country = 'ES'): Promise<BankAspsp[]> =>
+      fetch(`${workspaceUrl()}/bank-link/aspsps?country=${encodeURIComponent(country)}`, { headers: getHeaders() }).then(handleResponse),
+    startAuthorization: async (request: BankAuthorizationStart): Promise<{ url: string }> =>
+      fetch(`${workspaceUrl()}/bank-link/authorizations`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(request),
+      }).then(handleResponse),
+    /** workspaceId: el workspace que inició la vinculación, por si el activo cambió mientras el usuario estaba en el banco. */
+    completeAuthorization: async (code: string, state: string, workspaceId?: string): Promise<BankLink> =>
+      fetch(`${workspaceId ? `${API_BASE_URL}/workspaces/${workspaceId}` : workspaceUrl()}/bank-link/sessions`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ code, state }),
+      }).then(handleResponse),
+    selectAccount: async (accountUid: string): Promise<BankLink> =>
+      fetch(`${workspaceUrl()}/bank-link/account`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ accountUid }),
+      }).then(handleResponse),
+    sync: async (): Promise<BankSyncResult> =>
+      fetch(`${workspaceUrl()}/bank-link/sync`, {
+        method: 'POST',
+        headers: getHeaders(),
+      }).then(handleResponse).then(data => ({
+        ...data,
+        created: data.created.map((m: any) => new BankMovement(m)),
+      })),
+    unlink: async (): Promise<void> =>
+      fetch(`${workspaceUrl()}/bank-link`, {
+        method: 'DELETE',
+        headers: getHeaders(),
+      }).then(handleResponse),
+  },
 };
+
+export type BankLinkStatus = 'none' | 'pending' | 'awaiting-account' | 'active' | 'expired';
+export type PsuType = 'personal' | 'business';
+
+export interface BankAccountOption {
+  uid: string;
+  iban?: string | null;
+  name?: string | null;
+  currency?: string | null;
+}
+
+export interface BankLink {
+  configured: boolean;
+  status: BankLinkStatus;
+  aspspName?: string | null;
+  aspspCountry?: string | null;
+  psuType?: PsuType | null;
+  iban?: string | null;
+  accountName?: string | null;
+  currency?: string | null;
+  validUntil?: string | null;
+  syncFrom?: string | null;
+  lastSyncedAt?: string | null;
+  accountOptions?: BankAccountOption[] | null;
+}
+
+export interface BankAspsp {
+  name: string;
+  country: string;
+  psuTypes: PsuType[];
+  maximumConsentValidityDays?: number | null;
+  logo?: string | null;
+}
+
+export interface BankAuthorizationStart {
+  aspspName: string;
+  aspspCountry: string;
+  psuType: PsuType;
+  syncFrom?: string | null;
+}
+
+export interface BankSyncResult {
+  created: BankMovement[];
+  skippedExisting: number;
+  possibleDuplicates: { movementId: string; existingMovementId: string }[];
+  dateFrom: string;
+  dateTo: string;
+  balance?: { amount: number; currency?: string | null; type?: string | null; referenceDate?: string | null } | null;
+  link: BankLink;
+}
 
 export type BankMovementImportRowStatus = 'valid' | 'duplicate' | 'warning' | 'invalid';
 export type DuplicatePolicy = 'skip' | 'import-anyway';

@@ -11,6 +11,7 @@ import { SpacesRoute } from './routes/SpacesRoute';
 import { EntitiesRoute } from './routes/EntitiesRoute';
 import { JournalRoute } from './routes/JournalRoute';
 import { ChartOfAccountsRoute } from './routes/ChartOfAccountsRoute';
+import { BankLinkCallbackRoute } from './routes/BankLinkCallbackRoute';
 import { useAuth } from "react-oidc-context";
 import { setAccessToken } from './api';
 import { getEnv } from './runtimeConfig';
@@ -30,7 +31,11 @@ export default function App() {
     if (authDisabled) return;
     const isCallback = window.location.pathname === "/callback";
     if (!auth.isLoading && !auth.isAuthenticated && !isCallback) {
-      auth.signinRedirect();
+      // Conserva la vuelta del banco (?code&state) si la sesión OIDC caducó mientras el usuario estaba en el banco.
+      const returnTo = window.location.pathname === '/bank-link/callback'
+        ? window.location.pathname + window.location.search
+        : undefined;
+      auth.signinRedirect(returnTo ? { state: { returnTo } } : undefined);
     }
   }, [authDisabled, auth.isLoading, auth.isAuthenticated]);
 
@@ -121,6 +126,7 @@ export default function App() {
           <Route path="/entities" element={<EntitiesRoute />} />
           <Route path="/journal" element={<JournalRoute />} />
           <Route path="/coa" element={<ChartOfAccountsRoute />} />
+          <Route path="/bank-link/callback" element={<BankLinkCallbackRoute />} />
           <Route path="/callback" element={null} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
